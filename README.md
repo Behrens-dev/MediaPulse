@@ -56,21 +56,20 @@ the audio-track database (it re-uses the cache afterwards; re-run it whenever yo
 
 TrueNAS SCALE 24.10+ ("Electric Eel" and newer) runs Docker natively.
 
-### Option A — Custom App (recommended)
+Every push to `main` automatically builds and publishes the image to
+`ghcr.io/behrens-dev/plexpulse:latest` via GitHub Actions, so the NAS just pulls it.
 
-1. Build and push the image somewhere your NAS can pull from, e.g. GitHub Container Registry:
-   ```bash
-   docker build -t ghcr.io/<your-github-user>/plexpulse:latest .
-   docker push ghcr.io/<your-github-user>/plexpulse:latest
-   ```
-   (Or build directly on the NAS via SSH: clone this folder and `docker build -t plexpulse .`)
+### Option A — Install via YAML (recommended)
+
+1. Create the dataset/folder `/mnt/<your-pool>/apps/plexpulse` first (Datasets page), so the
+   SQLite database survives app updates.
 
 2. In the TrueNAS UI: **Apps → Discover Apps → ⋮ → Install via YAML**, and paste:
 
    ```yaml
    services:
      plexpulse:
-       image: ghcr.io/<your-github-user>/plexpulse:latest   # or plexpulse:latest if built on the NAS
+       image: ghcr.io/behrens-dev/plexpulse:latest
        restart: unless-stopped
        ports:
          - "8181:8181"
@@ -80,15 +79,15 @@ TrueNAS SCALE 24.10+ ("Electric Eel" and newer) runs Docker natively.
          TZ: America/New_York
    ```
 
-3. Create the dataset/folder `/mnt/<your-pool>/apps/plexpulse` first (Datasets page), so the
-   SQLite database survives app updates.
+3. Open `http://<truenas-ip>:8181` and configure as in Quick start.
 
-4. Open `http://<truenas-ip>:8181` and configure as in Quick start.
+To update later: push to `main` (or wait for the Actions build), then in TrueNAS stop and
+start the app — it pulls the newest `latest` image.
 
 ### Option B — Custom App form UI
 
 **Apps → Discover Apps → Custom App**, then:
-- Image repository: your pushed image (e.g. `ghcr.io/<user>/plexpulse`), tag `latest`
+- Image repository: `ghcr.io/behrens-dev/plexpulse`, tag `latest`
 - Port: container `8181` → host `8181`
 - Storage: host path `/mnt/<pool>/apps/plexpulse` → mount path `/config`
 - Environment (optional): `TZ`, `PLEX_URL`, `PLEX_TOKEN`

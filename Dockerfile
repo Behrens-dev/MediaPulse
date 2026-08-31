@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+LABEL org.opencontainers.image.source="https://github.com/Behrens-dev/PlexPulse"
+LABEL org.opencontainers.image.description="PlexPulse - Plex monitoring, library analytics, and notifications"
+
 WORKDIR /opt/plexpulse
 
 COPY requirements.txt .
