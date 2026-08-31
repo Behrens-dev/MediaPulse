@@ -1,8 +1,8 @@
 # PlexPulse
 
-A self-hosted Plex monitoring and notification app — a Tautulli-style dashboard with the
+A 100% free self-hosted Plex monitoring and notification app — a Tautulli-style dashboard with the
 extra features Tautulli doesn't have. Runs as a single lightweight Docker container,
-designed for TrueNAS SCALE.
+designed for TrueNAS SCALE. 
 
 ## Features
 
