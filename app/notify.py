@@ -64,7 +64,9 @@ def _send_sync(smtp: dict, subject: str, html: str, recipients: list[str],
     msg = MIMEMultipart("related")
     msg["Subject"] = subject
     msg["From"] = f"{smtp['from_name']} <{smtp['from_addr']}>"
-    msg["To"] = ", ".join(recipients)
+    # recipients are BCC'd: only the sender shows in To, the real recipient list
+    # rides on the SMTP envelope so people can't see each other's addresses
+    msg["To"] = f"{smtp['from_name']} <{smtp['from_addr']}>"
 
     alt = MIMEMultipart("alternative")
     alt.attach(MIMEText("This message contains HTML content.", "plain"))
