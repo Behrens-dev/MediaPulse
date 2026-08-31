@@ -574,10 +574,18 @@ $("#og-send").addEventListener("click", async () => {
     r.ok ? toast(`Sent to ${r.recipients.join(", ")}`) : toast(r.error, true);
   } catch (e) { toast(e.message, true); }
 });
+$("#og-auto-preview").addEventListener("click", async () => {
+  try {
+    const r = await api.post("/api/notify/outage/preview",
+      { message: $("#og-auto-msg").value, auto: true });
+    showPreview(r.subject + " (automatic)", r.html);
+  } catch (e) { toast(e.message, true); }
+});
 $("#og-save-auto").addEventListener("click", async () => {
   await api.post("/api/settings", {
     outage_auto_enabled: $("#og-auto-enabled").checked,
     outage_auto_delay_min: Number($("#og-auto-delay").value),
+    outage_auto_message: $("#og-auto-msg").value,
   });
   toast("Automatic outage notice settings saved");
 });
@@ -601,6 +609,7 @@ async function loadNotifySettings() {
   $("#nl-sched-days").value = s.newsletter_days_back || 30;
   $("#og-auto-enabled").checked = !!s.outage_auto_enabled;
   $("#og-auto-delay").value = String(s.outage_auto_delay_min || 15);
+  $("#og-auto-msg").value = s.outage_auto_message || "";
 }
 
 function splitEmails(v) {

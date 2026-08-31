@@ -204,8 +204,10 @@ class HealthMonitor:
         if time.time() - self.down_since < delay_min * 60:
             return
         self.outage_sent = True  # one notice per outage, even if the send fails
+        message = await db.get_setting("outage_auto_message", "")
         try:
-            await notify.send_outage(auto=True)
+            # never attaches an image — only the saved message rides along
+            await notify.send_outage(message=message, auto=True)
             log.info("automatic outage notice sent (down for %d+ min)", delay_min)
         except notify.NotifyError as e:
             log.warning("automatic outage notice failed: %s", e)

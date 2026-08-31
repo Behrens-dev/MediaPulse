@@ -49,7 +49,8 @@ SETTING_KEYS = [
     "smtp_from", "smtp_from_name",
     "recipients", "alert_recipients", "alert_server_down",
     "newsletter_enabled", "newsletter_day", "newsletter_hour", "newsletter_days_back",
-    "outage_auto_enabled", "outage_auto_delay_min", "auto_sync_interval_min",
+    "outage_auto_enabled", "outage_auto_delay_min", "outage_auto_message",
+    "auto_sync_interval_min",
 ]
 
 DEFAULTS = {
@@ -57,7 +58,7 @@ DEFAULTS = {
     "recipients": [], "alert_recipients": [], "alert_server_down": True,
     "newsletter_enabled": False, "newsletter_day": 1, "newsletter_hour": 9,
     "newsletter_days_back": 30,
-    "outage_auto_enabled": False, "outage_auto_delay_min": 15,
+    "outage_auto_enabled": False, "outage_auto_delay_min": 15, "outage_auto_message": "",
     "auto_sync_interval_min": 0,
 }
 
@@ -480,6 +481,7 @@ class OutageReq(BaseModel):
     eta: str = ""
     image_b64: str = ""
     image_mime: str = ""
+    auto: bool = False  # preview the automatic variant (never has an image)
     recipients: list[str] | None = None
 
 
@@ -541,8 +543,11 @@ async def maintenance_send(req: MaintenanceReq):
 @router.post("/notify/outage/preview")
 async def outage_preview(req: OutageReq):
     try:
-        subject, html, images = await notify.build_outage(
-            req.message, req.eta, req.image_b64, req.image_mime)
+        if req.auto:
+            subject, html, images = await notify.build_outage(req.message, auto=True)
+        else:
+            subject, html, images = await notify.build_outage(
+                req.message, req.eta, req.image_b64, req.image_mime)
     except notify.NotifyError as e:
         raise _err(e)
     return {"subject": subject, "html": notify.inline_images(html, images)}

@@ -226,21 +226,29 @@
             <button class="btn" id="og-preview">Preview</button>
             <button class="btn primary" id="og-send">Send now</button>
           </div>
-          <fieldset class="sched-box">
+          <fieldset class="sched-box sched-box-col">
             <legend>Automatic outage notice</legend>
-            <label class="chk"><input type="checkbox" id="og-auto-enabled"> Send automatically when the server has been down for</label>
-            <label>Delay
-              <select id="og-auto-delay">
-                <option value="1">1 minute</option>
-                <option value="5">5 minutes</option>
-                <option value="15" selected>15 minutes</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
-                <option value="180">3 hours</option>
-                <option value="720">12 hours</option>
-              </select>
+            <div class="sched-row">
+              <label class="chk"><input type="checkbox" id="og-auto-enabled"> Send automatically when the server has been down for</label>
+              <label>Delay
+                <select id="og-auto-delay">
+                  <option value="1">1 minute</option>
+                  <option value="5">5 minutes</option>
+                  <option value="15" selected>15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="180">3 hours</option>
+                  <option value="720">12 hours</option>
+                </select>
+              </label>
+            </div>
+            <label class="full">Message included in the automatic notice (optional — no image is ever attached)
+              <textarea id="og-auto-msg" rows="2" placeholder="The server is having issues and we're on it — no need to text me!"></textarea>
             </label>
-            <button class="btn" id="og-save-auto">Save</button>
+            <div class="sched-row">
+              <button class="btn" id="og-auto-preview">Preview auto notice</button>
+              <button class="btn primary" id="og-save-auto">Save</button>
+            </div>
           </fieldset>
         </div>
 
