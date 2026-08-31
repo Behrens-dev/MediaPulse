@@ -76,8 +76,17 @@ let currentPage = "activity";
 $$("nav button").forEach((b) =>
   b.addEventListener("click", () => showPage(b.dataset.page)));
 
+const PAGE_TITLES = {
+  activity: "Activity",
+  history: "Watch History",
+  libraries: "Libraries",
+  notifications: "Notifications",
+  settings: "Settings",
+};
+
 function showPage(page) {
   currentPage = page;
+  $("#page-title").textContent = PAGE_TITLES[page] || "PlexPulse";
   $$("nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
   $$(".page").forEach((p) => p.classList.toggle("hidden", p.id !== "page-" + page));
   if (page === "activity") loadActivity();
