@@ -79,6 +79,7 @@ Every push to `main` automatically builds and publishes the image to
    services:
      plexpulse:
        image: ghcr.io/behrens-dev/plexpulse:latest
+       pull_policy: always
        restart: unless-stopped
        ports:
          - "8181:8181"
