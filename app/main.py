@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from . import db
 from .api import router
 from .config import ensure_data_dir
-from .poller import activity_poller, health_monitor, newsletter_scheduler
+from .poller import activity_poller, auto_sync_scheduler, health_monitor, newsletter_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(activity_poller.run()),
         asyncio.create_task(health_monitor.run()),
         asyncio.create_task(newsletter_scheduler.run()),
+        asyncio.create_task(auto_sync_scheduler.run()),
     ]
     yield
     for t in tasks:

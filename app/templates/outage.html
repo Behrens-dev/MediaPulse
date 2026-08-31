@@ -1,0 +1,35 @@
+{% extends "_base.html" %}
+{% block content %}
+  <h1 style="color:#f0564f;font-size:22px;margin:0 0 4px;">🔴 {{ server }} is currently down</h1>
+  <p style="color:#8792a6;margin:0 0 18px;">
+    {% if auto %}Automatic notice · detected {{ when }}{% else %}Sent {{ when }}{% endif %}
+  </p>
+
+  {% if image_cid %}
+    <img src="cid:{{ image_cid }}" alt="" style="display:block;width:100%;max-width:544px;height:auto;border-radius:8px;margin-bottom:18px;">
+  {% endif %}
+
+  <div style="background:#2a1c1c;border-left:4px solid #f0564f;padding:14px 16px;border-radius:4px;margin-bottom:18px;color:#e6c2be;">
+    We're aware that the server is unavailable{% if auto %} and are looking into it{% endif %}.
+    You don't need to report it — this notice means it's already being worked on.
+  </div>
+
+  {% if message %}
+    <p style="color:#c8d4ea;">{{ message }}</p>
+  {% endif %}
+
+  {% if eta %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background:#1b212e;border-radius:8px;margin:14px 0;">
+      <tr>
+        <td style="padding:14px 20px;">
+          <div style="color:#8792a6;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Expected back online</div>
+          <div style="color:#3ecf8e;font-size:17px;font-weight:600;margin-top:2px;">{{ eta }}</div>
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
+  <p style="color:#8792a6;margin-top:16px;">Anything you were watching will pick back up once the
+  server returns. Thanks for your patience!</p>
+{% endblock %}

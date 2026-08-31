@@ -36,6 +36,10 @@
         <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
         Notifications
       </button>
+      <button data-page="users">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.5 2.5-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5c2.5.4 4 2.3 4 5"/></svg>
+        Users
+      </button>
       <button data-page="settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
         Settings
@@ -91,6 +95,27 @@
 
       <!-- ============ LIBRARIES ============ -->
       <section id="page-libraries" class="page hidden">
+        <div id="library-list-head" class="page-head">
+          <div class="muted small">Media info powers the audio-track analysis — sync manually per library or automatically.</div>
+          <div class="autosync">
+            <label class="muted small">Auto-sync all libraries
+              <select id="autosync-interval">
+                <option value="0">Off</option>
+                <option value="1">Every 1 min</option>
+                <option value="5">Every 5 min</option>
+                <option value="15">Every 15 min</option>
+                <option value="30">Every 30 min</option>
+                <option value="60">Every hour</option>
+                <option value="180">Every 3 hours</option>
+                <option value="720">Every 12 hours</option>
+                <option value="1440">Every 24 hours</option>
+                <option value="10080">Weekly</option>
+                <option value="43200">Monthly</option>
+              </select>
+            </label>
+            <button class="btn" id="autosync-save">Save</button>
+          </div>
+        </div>
         <div id="library-cards" class="cards"></div>
         <div id="library-detail" class="hidden">
           <div class="page-head">
@@ -126,9 +151,10 @@
       <!-- ============ NOTIFICATIONS ============ -->
       <section id="page-notifications" class="page hidden">
         <div class="tabs">
-          <button data-tab="newsletter" class="active">Newsletter</button>
+          <button data-tab="newsletter" class="active">Recently added</button>
           <button data-tab="recommend">Recommendations</button>
           <button data-tab="maintenance">Maintenance</button>
+          <button data-tab="outage">Outage alerts</button>
           <button data-tab="email-settings">Email settings</button>
           <button data-tab="sent-log">Sent log</button>
         </div>
@@ -174,11 +200,48 @@
             <label>Maintenance starts <input type="datetime-local" id="mw-start"></label>
             <label>Expected back online <input type="datetime-local" id="mw-end"></label>
             <label>What's happening (optional) <textarea id="mw-msg" rows="3" placeholder="Upgrading server storage — adding more space for movies!"></textarea></label>
+            <label>Image (optional, shows at the top of the email)
+              <input type="file" id="mw-image" accept="image/*">
+              <span class="muted small" id="mw-image-name"></span>
+            </label>
           </div>
           <div class="btn-row">
             <button class="btn" id="mw-preview">Preview</button>
             <button class="btn primary" id="mw-send">Send</button>
           </div>
+        </div>
+
+        <div id="tab-outage" class="tab-body panel hidden">
+          <p class="muted">Let everyone know you're aware the server is down — manually, or automatically
+          after it's been unreachable for a while.</p>
+          <div class="form-grid">
+            <label>Message (optional) <textarea id="og-msg" rows="3" placeholder="Power outage in the area — the server will be back once power is restored."></textarea></label>
+            <label>Expected back online (optional) <input id="og-eta" placeholder="Tonight around 8 PM"></label>
+            <label>Image (optional, shows at the top of the email)
+              <input type="file" id="og-image" accept="image/*">
+              <span class="muted small" id="og-image-name"></span>
+            </label>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="og-preview">Preview</button>
+            <button class="btn primary" id="og-send">Send now</button>
+          </div>
+          <fieldset class="sched-box">
+            <legend>Automatic outage notice</legend>
+            <label class="chk"><input type="checkbox" id="og-auto-enabled"> Send automatically when the server has been down for</label>
+            <label>Delay
+              <select id="og-auto-delay">
+                <option value="1">1 minute</option>
+                <option value="5">5 minutes</option>
+                <option value="15" selected>15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="180">3 hours</option>
+                <option value="720">12 hours</option>
+              </select>
+            </label>
+            <button class="btn" id="og-save-auto">Save</button>
+          </fieldset>
         </div>
 
         <div id="tab-email-settings" class="tab-body panel hidden">
@@ -213,6 +276,16 @@
         <div id="tab-sent-log" class="tab-body panel hidden">
           <div id="sent-log-table"></div>
         </div>
+      </section>
+
+      <!-- ============ USERS ============ -->
+      <section id="page-users" class="page hidden">
+        <div class="page-head">
+          <div class="muted small">Everyone with access to your Plex server (from your plex.tv account).
+          Aliases are only stored in PlexPulse — handy for remembering who's who.</div>
+          <button class="btn" id="users-refresh">Refresh</button>
+        </div>
+        <div id="users-table"></div>
       </section>
 
       <!-- ============ SETTINGS ============ -->

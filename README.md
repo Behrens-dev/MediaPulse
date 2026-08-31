@@ -24,15 +24,24 @@ designed for TrueNAS SCALE.
     *"anything with only AC3"* — perfect for planning ffmpeg re-encodes.
 
 **✉️ Notifications** (SMTP email, works with Gmail app passwords, etc.)
-- **Newsletter** — "what's new on the server" recently-added digest. Send on demand or on an
-  automatic monthly schedule (pick day of month + hour), with an optional personal note.
-- **Recommendations** — search your own libraries, pick titles, add a personal note per title
-  ("this one's a must-watch!"), and send a styled "My recommended watch list" email to family.
-- **Maintenance window** — pick a start and end date/time plus an optional reason and send a
-  clean "server will be down" notice.
-- **Server down/up alerts** — PlexPulse pings your server every minute and emails you (or a
-  separate admin list) when it goes down and again when it recovers.
+- **Recently added** — digest with poster art. Movies show poster + summary; TV shows show the
+  series poster + series summary with a bulleted list of exactly which episodes were added
+  (S08E07 · Baja, …); music groups new tracks by album. Send on demand or on an automatic
+  monthly schedule, with an optional personal note.
+- **Recommendations** — search your own libraries, pick titles (poster art included), add a
+  personal note per title, and send a styled "My recommended watch list" email to family.
+- **Maintenance window** — start/end date-time, optional reason, optional header image.
+- **Outage alerts** — a "we know it's down" notice with optional message, ETA, and image.
+  Can also send itself automatically once the server has been unreachable for a configurable
+  delay (1 min – 12 h).
+- **Server down/up alerts** — admin-facing email the moment the server goes down and again
+  when it recovers (separate recipient list supported).
 - Sent log of every email with success/failure.
+
+**👥 Users**
+- Everyone with access to your server (owner, shared users, Plex Home/managed users) with
+  their email, library access, play counts, and last-watched — plus an alias field so you can
+  note who's actually who.
 
 ## Quick start (any machine with Docker)
 

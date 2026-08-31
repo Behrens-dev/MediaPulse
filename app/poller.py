@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from . import db, plex, notify
+from . import db, media_sync, plex, notify
 from .config import SESSION_POLL_SECONDS, HEALTH_POLL_SECONDS, HEALTH_FAILURE_THRESHOLD
 
 log = logging.getLogger("plexpulse.poller")
@@ -156,11 +156,14 @@ class ActivityPoller:
 
 
 class HealthMonitor:
-    """Pings the Plex server; emails when it goes down and again when it recovers."""
+    """Pings the Plex server; emails the admin when it goes down / recovers, and can
+    also auto-send the family-facing outage notice after a configurable delay."""
 
     def __init__(self):
         self.failures = 0
         self.is_down = False
+        self.down_since: int | None = None
+        self.outage_sent = False
         self.last_ok_at: int | None = None
         self.last_error = ""
 
@@ -174,6 +177,8 @@ class HealthMonitor:
             self.last_error = ""
             if self.is_down:
                 self.is_down = False
+                self.down_since = None
+                self.outage_sent = False
                 self.failures = 0
                 if await db.get_setting("alert_server_down", True):
                     await notify.send_server_status(down=False)
@@ -183,8 +188,27 @@ class HealthMonitor:
             self.last_error = str(e)
             if not self.is_down and self.failures >= HEALTH_FAILURE_THRESHOLD:
                 self.is_down = True
+                self.down_since = int(time.time())
+                self.outage_sent = False
                 if await db.get_setting("alert_server_down", True):
                     await notify.send_server_status(down=True, error=str(e))
+            await self._maybe_auto_outage()
+
+    async def _maybe_auto_outage(self) -> None:
+        """Send the outage notice to everyone once the server has been down long enough."""
+        if not self.is_down or self.outage_sent or self.down_since is None:
+            return
+        if not await db.get_setting("outage_auto_enabled", False):
+            return
+        delay_min = int(await db.get_setting("outage_auto_delay_min", 15))
+        if time.time() - self.down_since < delay_min * 60:
+            return
+        self.outage_sent = True  # one notice per outage, even if the send fails
+        try:
+            await notify.send_outage(auto=True)
+            log.info("automatic outage notice sent (down for %d+ min)", delay_min)
+        except notify.NotifyError as e:
+            log.warning("automatic outage notice failed: %s", e)
 
     async def run(self) -> None:
         while True:
@@ -226,6 +250,41 @@ class NewsletterScheduler:
             await asyncio.sleep(300)
 
 
+class AutoSyncScheduler:
+    """Re-syncs media info for every library on the configured interval (0 = off)."""
+
+    async def tick(self) -> None:
+        interval_min = int(await db.get_setting("auto_sync_interval_min", 0))
+        if interval_min <= 0:
+            return
+        last = int(await db.get_setting("auto_sync_last", 0))
+        now = int(time.time())
+        if now - last < interval_min * 60:
+            return
+        client = await plex.get_client()
+        if not client.configured:
+            return
+        try:
+            sections = await client.sections()
+        except plex.PlexError:
+            return
+        await db.set_setting("auto_sync_last", now)
+        for sec in sections:
+            stype = sec.get("type", "")
+            if stype in media_sync.LEAF_TYPE:
+                await media_sync.sync_section(str(sec.get("key")), stype)
+        log.info("auto-sync completed for all libraries")
+
+    async def run(self) -> None:
+        while True:
+            try:
+                await self.tick()
+            except Exception:
+                log.exception("auto-sync tick failed")
+            await asyncio.sleep(30)
+
+
 activity_poller = ActivityPoller()
 health_monitor = HealthMonitor()
 newsletter_scheduler = NewsletterScheduler()
+auto_sync_scheduler = AutoSyncScheduler()

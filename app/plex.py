@@ -1,4 +1,6 @@
 """Thin async client for the Plex Media Server HTTP API (JSON responses)."""
+import xml.etree.ElementTree as ET
+
 import httpx
 
 from . import db
@@ -12,6 +14,10 @@ TYPE_EPISODE = 4
 TYPE_ARTIST = 8
 TYPE_ALBUM = 9
 TYPE_TRACK = 10
+TYPE_CLIP = 12
+TYPE_PHOTO = 13
+
+PLEXTV = "https://plex.tv"
 
 
 class PlexError(Exception):
@@ -123,6 +129,106 @@ class PlexClient:
                 params={"X-Plex-Container-Start": 0, "X-Plex-Container-Size": limit},
             )
         return mc.get("Metadata", [])
+
+    async def added_since(self, section_key: str, item_type: int, cutoff: int,
+                          max_items: int = 600) -> list[dict]:
+        """All leaf items in a section added after `cutoff` (newest first)."""
+        items: list[dict] = []
+        start = 0
+        while start < max_items:
+            mc = await self.get(
+                f"/library/sections/{section_key}/all",
+                params={
+                    "type": item_type,
+                    "sort": "addedAt:desc",
+                    "X-Plex-Container-Start": start,
+                    "X-Plex-Container-Size": 100,
+                },
+                timeout=60.0,
+            )
+            batch = mc.get("Metadata", [])
+            if not batch:
+                break
+            for m in batch:
+                if int(m.get("addedAt") or 0) >= cutoff:
+                    items.append(m)
+                else:
+                    return items
+            start += len(batch)
+            if start >= int(mc.get("totalSize", 0)):
+                break
+        return items
+
+    async def poster(self, thumb_path: str, width: int = 240, height: int = 360) -> tuple[bytes, str]:
+        return await self.get_bytes(
+            "/photo/:/transcode",
+            params={"url": thumb_path, "width": width, "height": height, "minSize": 1},
+        )
+
+    # ---- plex.tv (account / shared users) ----
+
+    async def plextv_users(self) -> list[dict]:
+        """Users this account shares servers with (incl. Plex Home users), from plex.tv."""
+        if not self.token:
+            raise PlexError("Plex token not configured")
+        async with httpx.AsyncClient() as client:
+            try:
+                r = await client.get(
+                    f"{PLEXTV}/api/users",
+                    headers={"X-Plex-Token": self.token,
+                             "X-Plex-Client-Identifier": "plexpulse",
+                             "X-Plex-Product": "PlexPulse"},
+                    timeout=30.0,
+                )
+            except httpx.HTTPError as e:
+                raise PlexError(f"Cannot reach plex.tv: {e}") from e
+        if r.status_code == 401:
+            raise PlexError("plex.tv rejected the token (401). The Users page needs your "
+                            "account owner token.")
+        if r.status_code >= 400:
+            raise PlexError(f"plex.tv returned HTTP {r.status_code}")
+        try:
+            root = ET.fromstring(r.text)
+        except ET.ParseError as e:
+            raise PlexError("plex.tv returned an unexpected response") from e
+        users = []
+        for u in root.findall("User"):
+            users.append({
+                "id": u.get("id"),
+                "username": u.get("username") or u.get("title") or "",
+                "title": u.get("title") or "",
+                "email": u.get("email") or "",
+                "thumb": u.get("thumb") or "",
+                "home": u.get("home") == "1",
+                "restricted": u.get("restricted") == "1",
+                "servers": [
+                    {
+                        "machine_id": s.get("machineIdentifier"),
+                        "all_libraries": s.get("allLibraries") == "1",
+                        "num_libraries": int(s.get("numLibraries") or 0),
+                        "pending": s.get("pending") == "1",
+                    }
+                    for s in u.findall("Server")
+                ],
+            })
+        return users
+
+    async def plextv_account(self) -> dict:
+        """The server owner's own plex.tv account."""
+        async with httpx.AsyncClient() as client:
+            try:
+                r = await client.get(
+                    f"{PLEXTV}/api/v2/user",
+                    headers={"X-Plex-Token": self.token, "Accept": "application/json",
+                             "X-Plex-Client-Identifier": "plexpulse",
+                             "X-Plex-Product": "PlexPulse"},
+                    timeout=30.0,
+                )
+            except httpx.HTTPError as e:
+                raise PlexError(f"Cannot reach plex.tv: {e}") from e
+        if r.status_code >= 400:
+            raise PlexError(f"plex.tv returned HTTP {r.status_code}")
+        return r.json()
 
     async def search(self, query: str, limit: int = 30) -> list[dict]:
         mc = await self.get("/search", params={"query": query, "limit": limit})

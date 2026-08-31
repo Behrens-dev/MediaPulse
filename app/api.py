@@ -49,6 +49,7 @@ SETTING_KEYS = [
     "smtp_from", "smtp_from_name",
     "recipients", "alert_recipients", "alert_server_down",
     "newsletter_enabled", "newsletter_day", "newsletter_hour", "newsletter_days_back",
+    "outage_auto_enabled", "outage_auto_delay_min", "auto_sync_interval_min",
 ]
 
 DEFAULTS = {
@@ -56,6 +57,8 @@ DEFAULTS = {
     "recipients": [], "alert_recipients": [], "alert_server_down": True,
     "newsletter_enabled": False, "newsletter_day": 1, "newsletter_hour": 9,
     "newsletter_days_back": 30,
+    "outage_auto_enabled": False, "outage_auto_delay_min": 15,
+    "auto_sync_interval_min": 0,
 }
 
 
@@ -197,7 +200,8 @@ async def libraries():
                 counts["albums"] = await client.section_count(key, plex.TYPE_ALBUM)
                 counts["tracks"] = await client.section_count(key, plex.TYPE_TRACK)
             elif stype == "photo":
-                counts["photos"] = 0
+                counts["photos"] = await client.section_count(key, plex.TYPE_PHOTO)
+                counts["videos"] = await client.section_count(key, plex.TYPE_CLIP)
         except plex.PlexError:
             pass
 
@@ -452,6 +456,7 @@ class RecItem(BaseModel):
     type: str = ""
     note: str = ""
     summary: str = ""
+    thumb: str = ""
 
 
 class RecommendReq(BaseModel):
@@ -465,22 +470,32 @@ class MaintenanceReq(BaseModel):
     start: str
     end: str
     message: str = ""
+    image_b64: str = ""
+    image_mime: str = ""
+    recipients: list[str] | None = None
+
+
+class OutageReq(BaseModel):
+    message: str = ""
+    eta: str = ""
+    image_b64: str = ""
+    image_mime: str = ""
     recipients: list[str] | None = None
 
 
 @router.post("/notify/newsletter/preview")
 async def newsletter_preview(req: NewsletterReq):
     try:
-        subject, html = await notify.build_newsletter(req.days_back, req.note)
+        subject, html, images = await notify.build_recently_added(req.days_back, req.note)
     except (plex.PlexError, notify.NotifyError) as e:
         raise _err(e)
-    return {"subject": subject, "html": html}
+    return {"subject": subject, "html": notify.inline_images(html, images)}
 
 
 @router.post("/notify/newsletter/send")
 async def newsletter_send(req: NewsletterReq):
     try:
-        recips = await notify.send_newsletter(req.days_back, req.note, req.recipients)
+        recips = await notify.send_recently_added(req.days_back, req.note, req.recipients)
         return {"ok": True, "recipients": recips}
     except (plex.PlexError, notify.NotifyError) as e:
         return {"ok": False, "error": str(e)}
@@ -489,8 +504,8 @@ async def newsletter_send(req: NewsletterReq):
 @router.post("/notify/recommend/preview")
 async def recommend_preview(req: RecommendReq):
     items = [i.model_dump() for i in req.items]
-    subject, html = await notify.build_recommendations(items, req.intro, req.heading)
-    return {"subject": subject, "html": html}
+    subject, html, images = await notify.build_recommendations(items, req.intro, req.heading)
+    return {"subject": subject, "html": notify.inline_images(html, images)}
 
 
 @router.post("/notify/recommend/send")
@@ -505,14 +520,39 @@ async def recommend_send(req: RecommendReq):
 
 @router.post("/notify/maintenance/preview")
 async def maintenance_preview(req: MaintenanceReq):
-    subject, html = await notify.build_maintenance(req.start, req.end, req.message)
-    return {"subject": subject, "html": html}
+    try:
+        subject, html, images = await notify.build_maintenance(
+            req.start, req.end, req.message, req.image_b64, req.image_mime)
+    except notify.NotifyError as e:
+        raise _err(e)
+    return {"subject": subject, "html": notify.inline_images(html, images)}
 
 
 @router.post("/notify/maintenance/send")
 async def maintenance_send(req: MaintenanceReq):
     try:
-        recips = await notify.send_maintenance(req.start, req.end, req.message, req.recipients)
+        recips = await notify.send_maintenance(
+            req.start, req.end, req.message, req.image_b64, req.image_mime, req.recipients)
+        return {"ok": True, "recipients": recips}
+    except notify.NotifyError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@router.post("/notify/outage/preview")
+async def outage_preview(req: OutageReq):
+    try:
+        subject, html, images = await notify.build_outage(
+            req.message, req.eta, req.image_b64, req.image_mime)
+    except notify.NotifyError as e:
+        raise _err(e)
+    return {"subject": subject, "html": notify.inline_images(html, images)}
+
+
+@router.post("/notify/outage/send")
+async def outage_send(req: OutageReq):
+    try:
+        recips = await notify.send_outage(
+            req.message, req.eta, req.image_b64, req.image_mime, recipients=req.recipients)
         return {"ok": True, "recipients": recips}
     except notify.NotifyError as e:
         return {"ok": False, "error": str(e)}
@@ -525,6 +565,93 @@ async def notify_log(limit: int = Query(50, le=200)):
         "SELECT * FROM sent_log ORDER BY sent_at DESC LIMIT ?", (limit,)
     ) as cur:
         return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------- users ----------
+
+@router.get("/users")
+async def users():
+    client = await plex.get_client()
+    aliases = await db.get_setting("user_aliases", {})
+    try:
+        machine_id = (await client.server_info()).get("machineIdentifier", "")
+        shared = await client.plextv_users()
+    except plex.PlexError as e:
+        raise _err(e)
+
+    # per-user play stats from our own history (matched by Plex username/title)
+    conn = await db.get_db()
+    async with conn.execute(
+        "SELECT user, COUNT(*) plays, MAX(started_at) last_play FROM history GROUP BY user"
+    ) as cur:
+        stats = {r["user"]: dict(r) for r in await cur.fetchall()}
+
+    out = []
+
+    # server owner first
+    try:
+        acct = await client.plextv_account()
+        owner_name = acct.get("username") or acct.get("title") or "Owner"
+        st = stats.get(owner_name) or stats.get(acct.get("title", ""), {})
+        out.append({
+            "id": str(acct.get("id", "owner")),
+            "username": owner_name,
+            "email": acct.get("email", ""),
+            "alias": aliases.get(str(acct.get("id", "owner")), ""),
+            "access": "Owner — all libraries",
+            "home": True,
+            "restricted": False,
+            "plays": st.get("plays", 0),
+            "last_play": st.get("last_play"),
+        })
+    except plex.PlexError:
+        pass
+
+    for u in shared:
+        srv = next((s for s in u["servers"] if s["machine_id"] == machine_id), None)
+        if machine_id and srv is None and u["servers"]:
+            continue  # shares a different server, not this one
+        if srv and srv.get("pending"):
+            access = "Invite pending"
+        elif srv is None:
+            access = "Plex Home" if u["home"] else "Shared"
+        elif srv["all_libraries"]:
+            access = "All libraries"
+        else:
+            access = f"{srv['num_libraries']} librar{'y' if srv['num_libraries'] == 1 else 'ies'}"
+        if u["home"]:
+            access += " · Home user"
+        if u["restricted"]:
+            access += " · Managed/restricted"
+        display = u["username"] or u["title"]
+        st = stats.get(display) or stats.get(u["title"], {})
+        out.append({
+            "id": str(u["id"]),
+            "username": display,
+            "email": u["email"],
+            "alias": aliases.get(str(u["id"]), ""),
+            "access": access,
+            "home": u["home"],
+            "restricted": u["restricted"],
+            "plays": st.get("plays", 0),
+            "last_play": st.get("last_play"),
+        })
+    return out
+
+
+@router.post("/users/alias")
+async def set_alias(payload: dict):
+    user_id = str(payload.get("user_id", ""))
+    alias = (payload.get("alias") or "").strip()
+    if not user_id:
+        raise HTTPException(400, "user_id required")
+    aliases = await db.get_setting("user_aliases", {})
+    if alias:
+        aliases[user_id] = alias
+    else:
+        aliases.pop(user_id, None)
+    await db.set_setting("user_aliases", aliases)
+    return {"ok": True}
 
 
 # ---------- image proxy (posters in the UI without exposing the token) ----------

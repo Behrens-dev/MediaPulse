@@ -81,6 +81,7 @@ const PAGE_TITLES = {
   history: "Watch History",
   libraries: "Libraries",
   notifications: "Notifications",
+  users: "Users",
   settings: "Settings",
 };
 
@@ -91,9 +92,23 @@ function showPage(page) {
   $$(".page").forEach((p) => p.classList.toggle("hidden", p.id !== "page-" + page));
   if (page === "activity") loadActivity();
   if (page === "history") { loadHistoryUsers(); loadHistoryStats(); loadHistory(); }
-  if (page === "libraries") loadLibraries();
+  if (page === "libraries") { loadLibraries(); loadAutoSync(); }
   if (page === "notifications") loadNotifySettings();
+  if (page === "users") loadUsers();
   if (page === "settings") loadSettings();
+}
+
+/* read a chosen image file as base64; resolves null when nothing selected */
+function readImage(inputEl) {
+  return new Promise((resolve, reject) => {
+    const f = inputEl.files && inputEl.files[0];
+    if (!f) return resolve(null);
+    if (f.size > 5 * 1024 * 1024) return reject(new Error("Image too large — keep it under 5 MB"));
+    const r = new FileReader();
+    r.onload = () => resolve({ b64: r.result.split(",")[1], mime: f.type || "image/jpeg" });
+    r.onerror = () => reject(new Error("Could not read the image file"));
+    r.readAsDataURL(f);
+  });
 }
 
 /* ---------- status badge ---------- */
@@ -224,6 +239,7 @@ const mState = { offset: 0, limit: 50 };
 async function loadLibraries() {
   $("#library-detail").classList.add("hidden");
   $("#library-cards").classList.remove("hidden");
+  $("#library-list-head").classList.remove("hidden");
   const cards = $("#library-cards");
   cards.innerHTML = `<div class="empty">Loading libraries…</div>`;
   try {
@@ -250,10 +266,21 @@ async function loadLibraries() {
   }
 }
 
+async function loadAutoSync() {
+  const s = await api.get("/api/settings");
+  $("#autosync-interval").value = String(s.auto_sync_interval_min || 0);
+}
+
+$("#autosync-save").addEventListener("click", async () => {
+  await api.post("/api/settings", { auto_sync_interval_min: Number($("#autosync-interval").value) });
+  toast("Auto-sync schedule saved");
+});
+
 window.openLibrary = async (key, title, type) => {
   currentLib = { key, title, type };
   mState.offset = 0;
   $("#library-cards").classList.add("hidden");
+  $("#library-list-head").classList.add("hidden");
   $("#library-detail").classList.remove("hidden");
   $("#lib-title").textContent = title;
   await refreshSyncStatus();
@@ -451,7 +478,7 @@ $("#rec-results").addEventListener("click", (e) => {
   if (!el || el.dataset.i === undefined) return;
   const r = window._recResults[Number(el.dataset.i)];
   const label = r.type === "episode" ? `${r.grandparent_title} — ${r.title}` : r.title;
-  recPicks.push({ title: label, year: r.year, type: r.type, summary: r.summary, note: "" });
+  recPicks.push({ title: label, year: r.year, type: r.type, summary: r.summary, thumb: r.thumb || "", note: "" });
   $("#rec-results").innerHTML = "";
   $("#rec-query").value = "";
   renderPicks();
@@ -492,22 +519,67 @@ $("#rec-send").addEventListener("click", async () => {
 });
 
 /* maintenance */
-function mwPayload() {
+async function mwPayload() {
   const fmt = (v) => v ? new Date(v).toLocaleString([], { weekday: "short", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-  return { start: fmt($("#mw-start").value), end: fmt($("#mw-end").value), message: $("#mw-msg").value };
+  const img = await readImage($("#mw-image"));
+  return {
+    start: fmt($("#mw-start").value), end: fmt($("#mw-end").value), message: $("#mw-msg").value,
+    image_b64: img ? img.b64 : "", image_mime: img ? img.mime : "",
+  };
 }
+$("#mw-image").addEventListener("change", () => {
+  const f = $("#mw-image").files[0];
+  $("#mw-image-name").textContent = f ? `${f.name} (${(f.size / 1024).toFixed(0)} KB)` : "";
+});
 $("#mw-preview").addEventListener("click", async () => {
-  const p = mwPayload();
-  if (!p.start || !p.end) return toast("Pick a start and end time", true);
-  const r = await api.post("/api/notify/maintenance/preview", p);
-  showPreview(r.subject, r.html);
+  try {
+    const p = await mwPayload();
+    if (!p.start || !p.end) return toast("Pick a start and end time", true);
+    const r = await api.post("/api/notify/maintenance/preview", p);
+    showPreview(r.subject, r.html);
+  } catch (e) { toast(e.message, true); }
 });
 $("#mw-send").addEventListener("click", async () => {
-  const p = mwPayload();
-  if (!p.start || !p.end) return toast("Pick a start and end time", true);
-  if (!confirm("Send the maintenance notice to all recipients?")) return;
-  const r = await api.post("/api/notify/maintenance/send", p);
-  r.ok ? toast(`Sent to ${r.recipients.join(", ")}`) : toast(r.error, true);
+  try {
+    const p = await mwPayload();
+    if (!p.start || !p.end) return toast("Pick a start and end time", true);
+    if (!confirm("Send the maintenance notice to all recipients?")) return;
+    const r = await api.post("/api/notify/maintenance/send", p);
+    r.ok ? toast(`Sent to ${r.recipients.join(", ")}`) : toast(r.error, true);
+  } catch (e) { toast(e.message, true); }
+});
+
+/* outage alerts */
+async function ogPayload() {
+  const img = await readImage($("#og-image"));
+  return {
+    message: $("#og-msg").value, eta: $("#og-eta").value,
+    image_b64: img ? img.b64 : "", image_mime: img ? img.mime : "",
+  };
+}
+$("#og-image").addEventListener("change", () => {
+  const f = $("#og-image").files[0];
+  $("#og-image-name").textContent = f ? `${f.name} (${(f.size / 1024).toFixed(0)} KB)` : "";
+});
+$("#og-preview").addEventListener("click", async () => {
+  try {
+    const r = await api.post("/api/notify/outage/preview", await ogPayload());
+    showPreview(r.subject, r.html);
+  } catch (e) { toast(e.message, true); }
+});
+$("#og-send").addEventListener("click", async () => {
+  try {
+    if (!confirm("Send the outage notice to all recipients now?")) return;
+    const r = await api.post("/api/notify/outage/send", await ogPayload());
+    r.ok ? toast(`Sent to ${r.recipients.join(", ")}`) : toast(r.error, true);
+  } catch (e) { toast(e.message, true); }
+});
+$("#og-save-auto").addEventListener("click", async () => {
+  await api.post("/api/settings", {
+    outage_auto_enabled: $("#og-auto-enabled").checked,
+    outage_auto_delay_min: Number($("#og-auto-delay").value),
+  });
+  toast("Automatic outage notice settings saved");
 });
 
 /* email settings */
@@ -527,6 +599,8 @@ async function loadNotifySettings() {
   $("#nl-sched-day").value = s.newsletter_day || 1;
   $("#nl-sched-hour").value = s.newsletter_hour ?? 9;
   $("#nl-sched-days").value = s.newsletter_days_back || 30;
+  $("#og-auto-enabled").checked = !!s.outage_auto_enabled;
+  $("#og-auto-delay").value = String(s.outage_auto_delay_min || 15);
 }
 
 function splitEmails(v) {
@@ -574,6 +648,40 @@ async function loadSentLog() {
         </tr>`).join("")}</tbody>
     </table>` : `<div class="empty">Nothing sent yet.</div>`;
 }
+
+/* ---------- users ---------- */
+
+async function loadUsers() {
+  const box = $("#users-table");
+  box.innerHTML = `<div class="empty">Loading users from plex.tv…</div>`;
+  try {
+    const users = await api.get("/api/users");
+    box.innerHTML = users.length ? `
+      <table>
+        <thead><tr><th>Username</th><th>Alias (real name)</th><th>Email</th><th>Access</th><th>Plays</th><th>Last watched</th></tr></thead>
+        <tbody>${users.map((u) => `
+          <tr>
+            <td><b>${esc(u.username)}</b></td>
+            <td><input class="alias-input" data-id="${esc(u.id)}" placeholder="Add a name…" value="${esc(u.alias)}"></td>
+            <td>${esc(u.email || "—")}</td>
+            <td>${esc(u.access)}</td>
+            <td>${u.plays || 0}</td>
+            <td>${u.last_play ? fmtDate(u.last_play) : "—"}</td>
+          </tr>`).join("")}</tbody>
+      </table>` : `<div class="empty">No users found.</div>`;
+    $$(".alias-input").forEach((el) =>
+      el.addEventListener("change", async () => {
+        await api.post("/api/users/alias", { user_id: el.dataset.id, alias: el.value });
+        toast("Alias saved");
+      }));
+  } catch (e) {
+    box.innerHTML = `<div class="empty">⚠ ${esc(e.message)}<br>
+      <span class="small">The Users page asks plex.tv who has access to your server, so it needs
+      internet access and your account-owner token.</span></div>`;
+  }
+}
+
+$("#users-refresh").addEventListener("click", loadUsers);
 
 /* ---------- settings ---------- */
 
