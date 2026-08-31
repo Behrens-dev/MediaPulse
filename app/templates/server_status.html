@@ -1,0 +1,22 @@
+{% extends "_base.html" %}
+{% block content %}
+  {% if test %}
+    <h1 style="color:#7bd88f;font-size:22px;margin:0 0 10px;">✅ Test email</h1>
+    <p style="color:#ccc;">Your PlexPulse email settings are working. Notifications for
+    <strong style="color:#fff;">{{ server }}</strong> will arrive at this address.</p>
+  {% elif down %}
+    <h1 style="color:#e5534b;font-size:22px;margin:0 0 10px;">🔴 {{ server }} is down</h1>
+    <p style="color:#ccc;">PlexPulse can no longer reach the Plex server. Detected at
+    <strong style="color:#fff;">{{ when }}</strong>.</p>
+    {% if error %}
+      <div style="background:#2c1e1e;border-left:4px solid #e5534b;padding:12px 16px;border-radius:4px;color:#e0b4b0;font-family:monospace;font-size:12px;margin-top:12px;">
+        {{ error }}
+      </div>
+    {% endif %}
+    <p style="color:#999;margin-top:14px;">You'll get another email as soon as it comes back online.</p>
+  {% else %}
+    <h1 style="color:#7bd88f;font-size:22px;margin:0 0 10px;">🟢 {{ server }} is back online</h1>
+    <p style="color:#ccc;">The Plex server is reachable again as of
+    <strong style="color:#fff;">{{ when }}</strong>. Happy streaming!</p>
+  {% endif %}
+{% endblock %}

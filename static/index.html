@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlexPulse</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▶</text></svg>">
+</head>
+<body>
+  <header>
+    <div class="brand">▶ <span>Plex</span>Pulse</div>
+    <nav>
+      <button data-page="activity" class="active">Activity</button>
+      <button data-page="history">History</button>
+      <button data-page="libraries">Libraries</button>
+      <button data-page="notifications">Notifications</button>
+      <button data-page="settings">Settings</button>
+    </nav>
+    <div id="server-badge" class="badge">…</div>
+  </header>
+
+  <main>
+    <!-- ============ ACTIVITY ============ -->
+    <section id="page-activity" class="page">
+      <div class="page-head">
+        <h1>Current Activity</h1>
+        <div id="activity-summary" class="muted"></div>
+      </div>
+      <div id="activity-list" class="cards"></div>
+    </section>
+
+    <!-- ============ HISTORY ============ -->
+    <section id="page-history" class="page hidden">
+      <div class="page-head">
+        <h1>Watch History</h1>
+        <div id="history-stats" class="stat-row"></div>
+      </div>
+      <div class="filters">
+        <input id="h-search" placeholder="Search title…">
+        <select id="h-user"><option value="">All users</option></select>
+        <select id="h-type">
+          <option value="">All types</option>
+          <option value="movie">Movies</option>
+          <option value="episode">TV episodes</option>
+          <option value="track">Music</option>
+        </select>
+        <select id="h-days">
+          <option value="0">All time</option>
+          <option value="1">Last 24h</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </div>
+      <div id="history-table"></div>
+      <div id="history-pager" class="pager"></div>
+    </section>
+
+    <!-- ============ LIBRARIES ============ -->
+    <section id="page-libraries" class="page hidden">
+      <div class="page-head"><h1>Libraries</h1></div>
+      <div id="library-cards" class="cards"></div>
+      <div id="library-detail" class="hidden">
+        <div class="page-head">
+          <h2 id="lib-title"></h2>
+          <div>
+            <button id="lib-sync-btn" class="btn">Sync media info</button>
+            <button id="lib-back-btn" class="btn ghost">← All libraries</button>
+          </div>
+        </div>
+        <div id="lib-sync-status" class="muted"></div>
+        <div id="lib-audio-summary" class="summary-grid"></div>
+        <div class="filters">
+          <input id="m-search" placeholder="Search title…">
+          <select id="m-container"><option value="">Any container</option></select>
+          <select id="m-resolution"><option value="">Any resolution</option></select>
+          <select id="m-vcodec"><option value="">Any video codec</option></select>
+          <select id="m-acodec"><option value="">Any audio codec</option></select>
+          <select id="m-achannels">
+            <option value="">Any channels</option>
+            <option value="1">1.0 mono</option>
+            <option value="2">2.0 stereo</option>
+            <option value="6">5.1</option>
+            <option value="7">6.1</option>
+            <option value="8">7.1</option>
+          </select>
+          <label class="chk"><input type="checkbox" id="m-missing-stereo"> Missing stereo track</label>
+        </div>
+        <div id="media-table"></div>
+        <div id="media-pager" class="pager"></div>
+      </div>
+    </section>
+
+    <!-- ============ NOTIFICATIONS ============ -->
+    <section id="page-notifications" class="page hidden">
+      <div class="page-head"><h1>Notifications</h1></div>
+      <div class="tabs">
+        <button data-tab="newsletter" class="active">📰 Newsletter</button>
+        <button data-tab="recommend">⭐ Recommendations</button>
+        <button data-tab="maintenance">🔧 Maintenance</button>
+        <button data-tab="email-settings">✉️ Email settings</button>
+        <button data-tab="sent-log">📋 Sent log</button>
+      </div>
+
+      <div id="tab-newsletter" class="tab-body">
+        <div class="form-grid">
+          <label>Look back (days) <input type="number" id="nl-days" value="30" min="1" max="365"></label>
+          <label>Personal note (optional) <textarea id="nl-note" rows="2" placeholder="Hope everyone's having a great month!"></textarea></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="nl-preview">Preview</button>
+          <button class="btn primary" id="nl-send">Send now</button>
+        </div>
+        <fieldset class="sched-box">
+          <legend>Automatic monthly schedule</legend>
+          <label class="chk"><input type="checkbox" id="nl-enabled"> Enabled</label>
+          <label>Day of month <input type="number" id="nl-sched-day" value="1" min="1" max="28"></label>
+          <label>Hour (0–23) <input type="number" id="nl-sched-hour" value="9" min="0" max="23"></label>
+          <label>Look back (days) <input type="number" id="nl-sched-days" value="30" min="1" max="90"></label>
+          <button class="btn" id="nl-save-sched">Save schedule</button>
+        </fieldset>
+      </div>
+
+      <div id="tab-recommend" class="tab-body hidden">
+        <div class="form-grid">
+          <label>Email heading <input id="rec-heading" placeholder="My recommended watch list"></label>
+          <label>Intro message <textarea id="rec-intro" rows="2" placeholder="These are so good, you have to watch them…"></textarea></label>
+        </div>
+        <div class="rec-search">
+          <input id="rec-query" placeholder="Search your Plex libraries…">
+          <div id="rec-results" class="rec-results"></div>
+        </div>
+        <h3>Picks <span class="muted" id="rec-count"></span></h3>
+        <div id="rec-picks"></div>
+        <div class="btn-row">
+          <button class="btn" id="rec-preview">Preview</button>
+          <button class="btn primary" id="rec-send">Send</button>
+        </div>
+      </div>
+
+      <div id="tab-maintenance" class="tab-body hidden">
+        <div class="form-grid">
+          <label>Maintenance starts <input type="datetime-local" id="mw-start"></label>
+          <label>Expected back online <input type="datetime-local" id="mw-end"></label>
+          <label>What's happening (optional) <textarea id="mw-msg" rows="3" placeholder="Upgrading server storage — adding more space for movies!"></textarea></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="mw-preview">Preview</button>
+          <button class="btn primary" id="mw-send">Send</button>
+        </div>
+      </div>
+
+      <div id="tab-email-settings" class="tab-body hidden">
+        <div class="form-grid two-col">
+          <label>SMTP host <input id="smtp-host" placeholder="smtp.gmail.com"></label>
+          <label>SMTP port <input type="number" id="smtp-port" value="587"></label>
+          <label>Username <input id="smtp-user" autocomplete="off"></label>
+          <label>Password / app password <input type="password" id="smtp-pass" autocomplete="new-password"></label>
+          <label>Security
+            <select id="smtp-security">
+              <option value="starttls">STARTTLS (587)</option>
+              <option value="ssl">SSL (465)</option>
+              <option value="none">None</option>
+            </select>
+          </label>
+          <label>From address <input id="smtp-from" placeholder="plex@example.com"></label>
+          <label>From name <input id="smtp-from-name" value="PlexPulse"></label>
+        </div>
+        <div class="form-grid">
+          <label>Recipients (comma separated) <textarea id="recipients" rows="2" placeholder="mom@example.com, brother@example.com"></textarea></label>
+          <label>Admin alert recipients — server down alerts (optional, defaults to recipients above)
+            <input id="alert-recipients" placeholder="you@example.com"></label>
+          <label class="chk"><input type="checkbox" id="alert-enabled" checked> Email me when the Plex server goes down / comes back</label>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" id="email-save">Save</button>
+          <button class="btn" id="email-test">Send test email</button>
+        </div>
+        <div id="email-msg" class="msg"></div>
+      </div>
+
+      <div id="tab-sent-log" class="tab-body hidden">
+        <div id="sent-log-table"></div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section id="page-settings" class="page hidden">
+      <div class="page-head"><h1>Settings</h1></div>
+      <div class="form-grid">
+        <label>Plex server URL <input id="plex-url" placeholder="http://192.168.1.50:32400"></label>
+        <label>Plex token (X-Plex-Token) <input id="plex-token" type="password" autocomplete="off"></label>
+        <label>Display name for emails (optional) <input id="server-name" placeholder="Behrens Family Plex"></label>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="plex-test">Test connection</button>
+        <button class="btn primary" id="plex-save">Save</button>
+      </div>
+      <div id="settings-msg" class="msg"></div>
+      <p class="muted small">Find your token: play any item in Plex Web → ⋮ → Get Info → View XML → the
+      <code>X-Plex-Token=</code> value in the URL.</p>
+    </section>
+  </main>
+
+  <!-- preview modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span id="modal-subject"></span>
+        <button id="modal-close" class="btn ghost">✕</button>
+      </div>
+      <iframe id="modal-frame"></iframe>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

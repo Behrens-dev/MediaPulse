@@ -1,0 +1,30 @@
+{% extends "_base.html" %}
+{% block content %}
+  <h1 style="color:#fff;font-size:22px;margin:0 0 4px;">{{ heading }}</h1>
+  <p style="color:#999;margin:0 0 18px;">Hand-picked from {{ server }} — it's all ready to stream.</p>
+
+  {% if intro %}
+    <div style="background:#26241c;border-left:4px solid #e5a00d;padding:12px 16px;border-radius:4px;margin-bottom:20px;color:#e8dcb8;">
+      {{ intro }}
+    </div>
+  {% endif %}
+
+  {% for item in items %}
+    <div style="padding:14px 0;border-bottom:1px solid #2a2a2a;">
+      <div>
+        <span style="color:#e5a00d;font-weight:700;font-size:16px;">{{ loop.index }}.</span>
+        <span style="color:#fff;font-weight:600;font-size:16px;">{{ item.title }}</span>
+        {% if item.year %}<span style="color:#888;"> ({{ item.year }})</span>{% endif %}
+        {% if item.type %}<span style="color:#666;font-size:11px;border:1px solid #444;border-radius:3px;padding:1px 5px;margin-left:6px;text-transform:uppercase;">{{ item.type }}</span>{% endif %}
+      </div>
+      {% if item.note %}
+        <div style="color:#d7c896;font-size:13px;margin-top:5px;font-style:italic;">&ldquo;{{ item.note }}&rdquo;</div>
+      {% endif %}
+      {% if item.summary %}
+        <div style="color:#9a9a9a;font-size:12px;margin-top:5px;">{{ item.summary }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <p style="color:#999;margin-top:20px;">Open Plex and search for any of these — happy watching! 🍿</p>
+{% endblock %}

@@ -1,0 +1,18 @@
+services:
+  plexpulse:
+    build: .
+    image: plexpulse:latest
+    container_name: plexpulse
+    restart: unless-stopped
+    ports:
+      - "8181:8181"
+    volumes:
+      - plexpulse-config:/config
+    environment:
+      # Optional: pre-seed the Plex connection (can also be set in the UI)
+      - PLEX_URL=${PLEX_URL:-}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
+      - TZ=${TZ:-America/New_York}
+
+volumes:
+  plexpulse-config:
