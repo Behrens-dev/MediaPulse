@@ -84,6 +84,7 @@
           <div id="actions-box" class="hidden" style="margin-top:22px">
             <div class="tabs" id="action-tabs">
               <button data-tab="downmix" class="active">Downmix audio</button>
+              <button data-tab="convert">Re-encode / convert</button>
               <button data-tab="embed_sub">Embed subtitles</button>
               <button data-tab="remove_audio">Remove audio</button>
               <button data-tab="audio_sync">Audio ↔ video sync</button>
@@ -108,6 +109,63 @@
                   <span><b>Normalize to only 5.1 + stereo (drop the 7.1)</b>
                   <span class="sub">Ends up with exactly one 5.1 and one stereo track — existing ones are kept, missing ones are downmixed, the 7.1 is dropped.</span></span>
                 </label>
+                <label class="opt" data-preset="add_mono">
+                  <input type="radio" name="dm-preset" value="add_mono">
+                  <span><b>Add a mono track</b>
+                  <span class="sub">Keeps every existing track and adds an AAC mono downmix (96k) made from the first audio track.</span></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- combined re-encode / convert -->
+            <div id="tab-convert" class="tab-body hidden">
+              <p class="muted small">Combine any of these in a single job. Anything left on
+              "keep" is copied byte-for-byte — so a codec-only change never re-encodes the video.</p>
+
+              <h3>Video &amp; container</h3>
+              <div class="form-grid two-col" style="max-width:640px">
+                <label>Video
+                  <select id="cv-vcodec">
+                    <option value="copy">Keep as-is (no re-encode)</option>
+                    <option value="h264">Re-encode to H.264</option>
+                    <option value="h265">Re-encode to H.265 / HEVC</option>
+                    <option value="av1">Re-encode to AV1</option>
+                  </select>
+                </label>
+                <label>Container
+                  <select id="cv-container">
+                    <option value="keep">Keep current</option>
+                    <option value="mkv">MKV</option>
+                    <option value="mp4">MP4</option>
+                  </select>
+                </label>
+                <label id="cv-quality-row" class="hidden">Quality
+                  <select id="cv-quality">
+                    <option value="high">High (bigger file)</option>
+                    <option value="balanced" selected>Balanced</option>
+                    <option value="small">Smaller file</option>
+                  </select>
+                </label>
+                <label id="cv-speed-row" class="hidden">Encode speed
+                  <select id="cv-speed">
+                    <option value="fast">Fast</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="slow">Slow (best compression)</option>
+                  </select>
+                </label>
+              </div>
+              <p class="muted small">Video re-encoding is the slow one (often around real-time
+              or worse) — audio-only changes take seconds to minutes. MP4 output drops
+              image-based subtitles (PGS/VOBSUB) and needs MP4-friendly codecs; MediaForge
+              checks and tells you before the job is queued.</p>
+
+              <h3>Audio tracks</h3>
+              <div id="cv-audio-list" class="opts"></div>
+
+              <h3>Add downmixed tracks</h3>
+              <div id="cv-add-list" class="opts"></div>
+              <div class="btn-row" style="margin-top:8px">
+                <button class="btn small" id="cv-add-btn">+ Add a track</button>
               </div>
             </div>
 

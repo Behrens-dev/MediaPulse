@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.4.0"
 
 DATA_DIR = Path(os.environ.get("MEDIAFORGE_DATA", "/config"))
 DB_PATH = DATA_DIR / "mediaforge.db"

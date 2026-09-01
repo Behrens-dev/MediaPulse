@@ -283,7 +283,7 @@ SUB_UPLOAD_MAX = 10 * 1024 * 1024
 @router.post("/jobs")
 async def create_job(payload: dict):
     kind = payload.get("kind")
-    if kind not in ("downmix", "embed_sub", "remove_audio", "audio_sync", "sub_sync"):
+    if kind not in ("downmix", "convert", "embed_sub", "remove_audio", "audio_sync", "sub_sync"):
         raise _bad(f"Unknown job kind: {kind}")
     plex_path = (payload.get("path") or "").strip()
     if not plex_path:
@@ -303,7 +303,12 @@ async def create_job(payload: dict):
         if not await exec_.exists(in_path):
             raise _bad(f"Input file not found at {in_path}. "
                        "Check the path mappings in Settings.")
-        out_path = ffmpeg_cmd.output_path(in_path, suffix)
+        ext = None
+        if kind == "convert":
+            cont = (options.get("container") or "keep").lower()
+            if cont in ("mkv", "mp4"):
+                ext = "." + cont
+        out_path = ffmpeg_cmd.output_path(in_path, suffix, ext)
         if await exec_.exists(out_path):
             raise _bad(f"{os.path.basename(out_path)} already exists — pick a different suffix.")
 

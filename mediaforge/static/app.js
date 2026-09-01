@@ -58,11 +58,28 @@ function channelName(ch) {
 
 const KIND_LABELS = {
   downmix: "Downmix audio",
+  convert: "Re-encode / convert",
   embed_sub: "Embed subtitles",
   remove_audio: "Remove audio",
   audio_sync: "Audio sync",
   sub_sync: "Subtitle sync",
 };
+
+const AUDIO_CODECS = [
+  ["aac", "AAC"], ["ac3", "Dolby Digital (AC3)"], ["eac3", "DD+ (E-AC3)"],
+  ["opus", "Opus"], ["mp3", "MP3"], ["flac", "FLAC (lossless)"],
+];
+const BITRATE_CHOICES = ["96k", "128k", "192k", "256k", "320k", "384k", "448k", "640k"];
+
+function codecOptions(selected = "aac") {
+  return AUDIO_CODECS.map(([v, l]) =>
+    `<option value="${v}"${v === selected ? " selected" : ""}>${l}</option>`).join("");
+}
+
+function bitrateOptions() {
+  return `<option value="">Auto bitrate</option>` +
+    BITRATE_CHOICES.map((b) => `<option value="${b}">${b}</option>`).join("");
+}
 
 /* ---------- navigation ---------- */
 
@@ -297,7 +314,8 @@ function renderActions() {
   const has = (n) => (t.audio || []).some((a) => a.channels === n);
 
   // downmix preset availability
-  const avail = { "71_add": has(8), "51_add": has(6), "71_only": has(8) };
+  const avail = { "71_add": has(8), "51_add": has(6), "71_only": has(8),
+                  "add_mono": (t.audio || []).length > 0 };
   $$("#downmix-opts .opt").forEach((el) => {
     const ok = avail[el.dataset.preset];
     el.classList.toggle("disabled", !ok);
@@ -323,8 +341,75 @@ function renderActions() {
     i.addEventListener("change", () =>
       i.closest(".opt").classList.toggle("selected", i.checked)));
 
+  renderConvertTab(t);
+
   $("#actions-box").classList.remove("hidden");
 }
+
+/* ---------- combined re-encode / convert tab ---------- */
+
+function renderConvertTab(t) {
+  $("#cv-audio-list").innerHTML = (t.audio || []).map((a) => {
+    const cls = a.channels >= 6 ? "surround" : (a.channels === 2 ? "stereo" : "");
+    return `<div class="opt selected" data-a="${a.a_index}" style="align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="flex:1;min-width:180px"><b><span class="audio-chip ${cls}">${esc((a.codec || "?").toUpperCase())} ${channelName(a.channels)}</span>
+      ${esc(a.language || "")}</b>
+      <span class="sub">${esc(a.title || "a:" + a.a_index)}</span></span>
+      <select class="cv-action" data-a="${a.a_index}">
+        <option value="copy">Keep (copy)</option>
+        <option value="convert">Convert to…</option>
+        <option value="remove">Remove</option>
+      </select>
+      <select class="cv-codec hidden">${codecOptions()}</select>
+      <select class="cv-bitrate hidden">${bitrateOptions()}</select>
+    </div>`;
+  }).join("") || '<div class="muted">No audio streams found.</div>';
+
+  $$("#cv-audio-list .cv-action").forEach((sel) =>
+    sel.addEventListener("change", () => {
+      const row = sel.closest(".opt");
+      const conv = sel.value === "convert";
+      row.querySelector(".cv-codec").classList.toggle("hidden", !conv);
+      row.querySelector(".cv-bitrate").classList.toggle("hidden", !conv);
+      row.classList.toggle("selected", sel.value !== "remove");
+    }));
+
+  $("#cv-add-list").innerHTML = "";
+  $("#cv-vcodec").value = "copy";
+  $("#cv-container").value = "keep";
+  onVcodecChange();
+}
+
+function onVcodecChange() {
+  const enc = $("#cv-vcodec").value !== "copy";
+  $("#cv-quality-row").classList.toggle("hidden", !enc);
+  $("#cv-speed-row").classList.toggle("hidden", !enc);
+}
+$("#cv-vcodec").addEventListener("change", onVcodecChange);
+$("#cv-container").addEventListener("change", updateOutPreview);
+
+$("#cv-add-btn").addEventListener("click", () => {
+  const t = tracksData();
+  if (!t.audio || !t.audio.length) return toast("No audio tracks in this file", true);
+  const srcOpts = t.audio.map((a) =>
+    `<option value="${a.a_index}">a:${a.a_index} — ${esc((a.codec || "?").toUpperCase())} ${channelName(a.channels)} ${esc(a.language || "")}</option>`).join("");
+  const div = document.createElement("div");
+  div.className = "opt selected cv-add-row";
+  div.style.cssText = "align-items:center;gap:10px;flex-wrap:wrap";
+  div.innerHTML = `<span class="muted small">New</span>
+    <select class="ar-layout">
+      <option value="stereo">Stereo</option>
+      <option value="5.1">5.1</option>
+      <option value="mono">Mono</option>
+    </select>
+    <select class="ar-codec">${codecOptions()}</select>
+    <select class="ar-bitrate">${bitrateOptions()}</select>
+    <span class="muted small">from</span>
+    <select class="ar-source">${srcOpts}</select>
+    <button class="btn ghost small danger ar-del">✕</button>`;
+  div.querySelector(".ar-del").addEventListener("click", () => div.remove());
+  $("#cv-add-list").appendChild(div);
+});
 
 function syncOptSelection(scope) {
   $$(scope + " .opt").forEach((el) => {
@@ -353,7 +438,11 @@ function updateOutPreview() {
   const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   const dot = path.lastIndexOf(".");
   const base = dot > slash ? path.slice(slash + 1, dot) : path.slice(slash + 1);
-  const ext = dot > slash ? path.slice(dot) : "";
+  let ext = dot > slash ? path.slice(dot) : "";
+  if (state.tab === "convert") {
+    const c = $("#cv-container").value;
+    if (c === "mkv" || c === "mp4") ext = "." + c;
+  }
   if (!suffix) {
     el.textContent = "Enter a suffix — e.g. " + base + "_encoded" + ext;
     el.className = "out-preview bad";
@@ -398,6 +487,32 @@ $("#queue-btn").addEventListener("click", async () => {
       const sel = $$("#downmix-opts input").find((i) => i.checked);
       if (!sel) throw new Error("Pick a downmix operation — none of them fit this file's audio tracks.");
       options.preset = sel.value;
+    } else if (kind === "convert") {
+      options.video = {
+        codec: $("#cv-vcodec").value,
+        quality: $("#cv-quality").value,
+        speed: $("#cv-speed").value,
+      };
+      options.container = $("#cv-container").value;
+      options.audio = $$("#cv-audio-list .cv-action").map((sel) => {
+        const row = sel.closest(".opt");
+        return {
+          index: +sel.dataset.a,
+          action: sel.value,
+          codec: row.querySelector(".cv-codec").value,
+          bitrate: row.querySelector(".cv-bitrate").value,
+        };
+      });
+      options.add = $$("#cv-add-list .cv-add-row").map((row) => ({
+        source: +row.querySelector(".ar-source").value,
+        layout: row.querySelector(".ar-layout").value,
+        codec: row.querySelector(".ar-codec").value,
+        bitrate: row.querySelector(".ar-bitrate").value,
+      }));
+      const changed = options.video.codec !== "copy" || options.container !== "keep" ||
+        options.add.length > 0 || options.audio.some((a) => a.action !== "copy");
+      if (!changed) throw new Error("Pick at least one change — a video codec, a container, " +
+        "an audio conversion/removal, or a new track.");
     } else if (kind === "embed_sub") {
       const up = await readSubFile();
       if (up) { options.sub_b64 = up.b64; options.sub_name = up.name; }

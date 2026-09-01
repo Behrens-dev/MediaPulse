@@ -16,7 +16,8 @@ container** or **on the Plex server itself over SSH** (Linux *or* Windows).
 
 | Job | What happens |
 |---|---|
-| **Downmix audio** | `7.1 → add 5.1 + stereo`, `5.1 → add stereo`, or `normalize to only 5.1 + stereo (drop the 7.1)` — the same pan formulas as the proven `scripts/ffmpeg-downmix*.ps1` scripts. New tracks are AAC (5.1 @ 384k, stereo @ 192k) and named ("5.1 Surround (AAC)", "Stereo (AAC)"); everything else is stream-copied. |
+| **Downmix audio** | `7.1 → add 5.1 + stereo`, `5.1 → add stereo`, `normalize to only 5.1 + stereo (drop the 7.1)`, or `add a mono track` — the same pan formulas as the proven `scripts/ffmpeg-downmix*.ps1` scripts. New tracks are AAC (5.1 @ 384k, stereo @ 192k, mono @ 96k) and named ("5.1 Surround (AAC)", "Stereo (AAC)", …); everything else is stream-copied. |
+| **Re-encode / convert** | The combined job — mix and match in one pass: re-encode video (H.264 / H.265 / AV1, quality + speed presets), change container (MKV ↔ MP4, with compatibility checks), convert any audio track's codec (AAC, AC3/Dolby Digital, E-AC3, Opus, MP3, FLAC), remove tracks, and add downmixed 5.1/stereo/mono tracks. Anything left on "keep" is stream-copied, so a single small change never re-encodes the whole file. |
 | **Embed subtitles** | Adds an `.srt/.ass/.ssa/.vtt/.smi` file as a soft, selectable track (off by default unless you say otherwise), with your choice of track name and language. Upload the file through the browser or point at a path on the server. No re-encode. |
 | **Remove audio** | Shows every audio track (codec, channels, language) — uncheck the ones you don't want (that mono track, the 7.1, the wrong-language stereo) and the rest are copied untouched. |
 | **Audio ↔ video sync** | *Auto-repair drift* (re-times audio onto the video's timestamps via `aresample=async`) or *fixed offset* in milliseconds (pure remux). |
