@@ -243,10 +243,15 @@ class SSHExecutor:
                 raise ExecError(f"Could not start SFTP on the server: {e}") from e
         return self._sftp
 
-    @staticmethod
-    def _sftp_path(path: str) -> str:
-        """Windows OpenSSH's SFTP server wants forward slashes."""
-        return path.replace("\\", "/")
+    def _sftp_forms(self, path: str) -> list[str]:
+        """Path spellings to try against the SFTP server. Windows OpenSSH
+        accepts forward slashes, and depending on version wants absolute
+        drive paths either as 'D:/x' or '/D:/x' — so we try both."""
+        p = path.replace("\\", "/")
+        forms = [p]
+        if self.windows and len(p) >= 2 and p[1] == ":" and not p.startswith("/"):
+            forms.append("/" + p)
+        return forms
 
     async def probe(self, path: str) -> dict:
         rc, out, err = await self._run(
@@ -256,19 +261,54 @@ class SSHExecutor:
             raise ExecError(f"ffprobe failed on the Plex server: {err.strip() or 'unknown error'}")
         return json.loads(out)
 
+    async def _shell_exists(self, path: str) -> bool:
+        """Existence check through the login shell — authoritative for what the
+        SSH account can actually see, and immune to SFTP path-format quirks."""
+        if self.windows:
+            await self._ensure_win_shell()
+            if self._win_shell == "powershell":
+                cmd = f'if (Test-Path -LiteralPath "{path}") {{ exit 0 }} else {{ exit 1 }}'
+            else:
+                cmd = f'if exist "{path}" (exit 0) else (exit 1)'
+            rc, _, _ = await self._run_raw(cmd, timeout=30.0)
+            return rc == 0
+        rc, _, _ = await self._run(["test", "-e", path], timeout=30.0)
+        return rc == 0
+
     async def exists(self, path: str) -> bool:
-        sftp = await self._sftp_client()
         try:
-            return await sftp.exists(self._sftp_path(path))
-        except Exception as e:
-            raise ExecError(f"Could not check {path} over SFTP: {e}") from e
+            sftp = await self._sftp_client()
+            for form in self._sftp_forms(path):
+                try:
+                    if await sftp.exists(form):
+                        return True
+                except Exception:
+                    continue
+        except ExecError:
+            pass  # no SFTP subsystem — the shell check below still works
+        return await self._shell_exists(path)
 
     async def remove(self, path: str) -> None:
-        sftp = await self._sftp_client()
         try:
-            await sftp.remove(self._sftp_path(path))
-        except Exception:
+            sftp = await self._sftp_client()
+            for form in self._sftp_forms(path):
+                try:
+                    await sftp.remove(form)
+                    return
+                except Exception:
+                    continue
+        except ExecError:
             pass
+        if self.windows:
+            await self._ensure_win_shell()
+            if self._win_shell == "powershell":
+                await self._run_raw(
+                    f'Remove-Item -LiteralPath "{path}" -Force -ErrorAction SilentlyContinue',
+                    timeout=30.0)
+            else:
+                await self._run_raw(f'del /f /q "{path}"', timeout=30.0)
+        else:
+            await self._run(["rm", "-f", path], timeout=30.0)
 
     async def staging_path(self, name: str) -> str:
         """A temp-file path on the remote server for staged uploads."""
@@ -280,11 +320,14 @@ class SSHExecutor:
     async def put_file(self, local_path: str, dest_path: str) -> str:
         """Copy a staged file (e.g. an uploaded subtitle) to the Plex server."""
         sftp = await self._sftp_client()
-        try:
-            await sftp.put(local_path, self._sftp_path(dest_path))
-        except Exception as e:
-            raise ExecError(f"Could not copy file to the Plex server: {e}") from e
-        return dest_path
+        last_err: Exception | None = None
+        for form in self._sftp_forms(dest_path):
+            try:
+                await sftp.put(local_path, form)
+                return dest_path
+            except Exception as e:
+                last_err = e
+        raise ExecError(f"Could not copy file to the Plex server: {last_err}")
 
     async def cleanup_staged(self, path: str) -> None:
         await self.remove(path)
