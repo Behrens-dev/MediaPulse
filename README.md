@@ -89,6 +89,13 @@ designed for TrueNAS SCALE.
   their email, library access, play counts, and last-watched — plus an alias field so you can
   note who's actually who.
 
+**💾 Backup & restore**
+- One-click JSON backup of all settings (Plex connection, email config, schedules, alert
+  options), the full watch history, user aliases, and the sent-email log. Restore it into a
+  fresh container to migrate to a new system with everything intact — only the library
+  media-info cache is excluded (it rebuilds with one "Sync media info" click). The backup
+  file contains your Plex token and SMTP password, so store it somewhere safe.
+
 ## Quick start (any machine with Docker)
 
 ```bash

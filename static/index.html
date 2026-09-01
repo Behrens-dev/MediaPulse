@@ -40,6 +40,10 @@
         <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.5 2.5-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5c2.5.4 4 2.3 4 5"/></svg>
         Users
       </button>
+      <button data-page="backup">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10"/><polyline points="8 9 12 13 16 9"/><path d="M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        Backup
+      </button>
       <button data-page="settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
         Settings
@@ -294,6 +298,39 @@
           <button class="btn" id="users-refresh">Refresh</button>
         </div>
         <div id="users-table"></div>
+      </section>
+
+      <!-- ============ BACKUP & RESTORE ============ -->
+      <section id="page-backup" class="page hidden">
+        <div class="panel" style="max-width:680px">
+          <h3>Download a backup</h3>
+          <p class="muted small">One JSON file with everything that makes this install yours:
+          all settings (Plex connection, email settings, recipients, schedules, alert options),
+          the full watch history, user aliases, and the sent-email log.
+          The library media-info cache is <b>not</b> included — it rebuilds with one
+          "Sync media info" click after a restore.</p>
+          <p class="muted small"><b>The file contains your Plex token and SMTP password</b> —
+          store it somewhere safe.</p>
+          <div class="btn-row">
+            <button class="btn primary" id="backup-download">Download backup</button>
+          </div>
+        </div>
+
+        <div class="panel" style="max-width:680px; margin-top:16px">
+          <h3>Restore from a backup</h3>
+          <p class="muted small">Rebuilding the container or migrating to a new system?
+          Install MediaPulse, open this page, and restore your file — the Plex connection,
+          notification setup, users, and all prior history come back exactly as they were.
+          Restoring <b>replaces</b> the watch history and sent log on this instance and
+          overwrites any settings included in the file.</p>
+          <div class="form-grid">
+            <label>Backup file <input type="file" id="restore-file" accept=".json,application/json"></label>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="restore-btn">Restore</button>
+          </div>
+          <div id="restore-msg" class="msg"></div>
+        </div>
       </section>
 
       <!-- ============ SETTINGS ============ -->

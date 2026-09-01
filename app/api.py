@@ -1,5 +1,6 @@
 """All REST endpoints consumed by the web UI."""
 import asyncio
+import json
 import time
 
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -657,6 +658,79 @@ async def set_alias(payload: dict):
         aliases.pop(user_id, None)
     await db.set_setting("user_aliases", aliases)
     return {"ok": True}
+
+
+# ---------- backup & restore ----------
+
+# What goes in a backup: the full settings table (Plex connection, SMTP config,
+# recipients, schedules, alert options, user aliases) plus watch history and the
+# sent-email log. The media-info cache (media_items / audio_streams) is excluded
+# on purpose — it's large and rebuilds from Plex with one "Sync media info" click.
+BACKUP_TABLES = ("history", "sent_log")
+BACKUP_VERSION = 1
+
+
+@router.get("/backup")
+async def backup():
+    conn = await db.get_db()
+    out = {
+        "app": "mediapulse",
+        "backup_version": BACKUP_VERSION,
+        "exported_at": int(time.time()),
+    }
+    async with conn.execute("SELECT key, value FROM settings") as cur:
+        rows = await cur.fetchall()
+    out["settings"] = {r["key"]: json.loads(r["value"]) for r in rows}
+    for table in BACKUP_TABLES:
+        async with conn.execute(f"SELECT * FROM {table}") as cur:
+            out[table] = [dict(r) for r in await cur.fetchall()]
+    fname = "mediapulse-backup-" + time.strftime("%Y-%m-%d") + ".json"
+    return Response(
+        content=json.dumps(out),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.post("/restore")
+async def restore(payload: dict):
+    if payload.get("app") not in ("mediapulse", "plexpulse"):
+        raise HTTPException(400, "This doesn't look like a MediaPulse backup file.")
+    if int(payload.get("backup_version") or 0) != BACKUP_VERSION:
+        raise HTTPException(400, "Unsupported backup version "
+                                 f"({payload.get('backup_version')!r}).")
+    settings = payload.get("settings") or {}
+    if not isinstance(settings, dict):
+        raise HTTPException(400, "Malformed backup: settings must be an object.")
+
+    for k, v in settings.items():
+        await db.set_setting(k, v)
+    counts = {"settings": len(settings)}
+
+    conn = await db.get_db()
+    for table in BACKUP_TABLES:
+        rows = payload.get(table) or []
+        # insert only columns that exist in this build's schema, so backups
+        # survive schema additions in either direction
+        async with conn.execute(f"PRAGMA table_info({table})") as cur:
+            cols = {r["name"] for r in await cur.fetchall()}
+        await conn.execute(f"DELETE FROM {table}")
+        n = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            keys = [k for k in row if k in cols]
+            if not keys:
+                continue
+            await conn.execute(
+                f"INSERT INTO {table}({','.join(keys)}) "
+                f"VALUES({','.join('?' * len(keys))})",
+                [row[k] for k in keys],
+            )
+            n += 1
+        counts[table] = n
+    await conn.commit()
+    return {"ok": True, "restored": counts}
 
 
 # ---------- image proxy (posters in the UI without exposing the token) ----------

@@ -82,6 +82,7 @@ const PAGE_TITLES = {
   libraries: "Libraries",
   notifications: "Notifications",
   users: "Users",
+  backup: "Backup & Restore",
   settings: "Settings",
 };
 
@@ -721,6 +722,43 @@ $("#plex-save").addEventListener("click", async () => {
   const m = $("#settings-msg");
   m.textContent = "Saved ✓"; m.className = "msg ok";
   refreshStatus();
+});
+
+/* ---------- backup & restore ---------- */
+
+$("#backup-download").addEventListener("click", () => {
+  window.location.href = "/api/backup";
+});
+
+$("#restore-btn").addEventListener("click", async () => {
+  const m = $("#restore-msg");
+  m.className = "msg";
+  m.textContent = "";
+  const f = $("#restore-file").files && $("#restore-file").files[0];
+  if (!f) {
+    m.className = "msg err";
+    m.textContent = "Choose a backup file first.";
+    return;
+  }
+  if (!confirm("Restore this backup? It replaces the watch history and sent log on " +
+               "this instance and overwrites the settings included in the file.")) return;
+  try {
+    let data;
+    try { data = JSON.parse(await f.text()); }
+    catch { throw new Error("That file isn't valid JSON — is it really a MediaPulse backup?"); }
+    m.textContent = "Restoring…";
+    const r = await api.post("/api/restore", data);
+    m.className = "msg ok";
+    m.textContent = `Restored ${r.restored.settings} settings, ` +
+      `${r.restored.history.toLocaleString()} history entries, and ` +
+      `${r.restored.sent_log.toLocaleString()} sent-log entries. ` +
+      "Reload the page to see everything.";
+    toast("Backup restored");
+    refreshStatus();
+  } catch (e) {
+    m.className = "msg err";
+    m.textContent = e.message;
+  }
 });
 
 /* ---------- boot ---------- */
