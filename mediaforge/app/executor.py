@@ -21,6 +21,7 @@ async def get_exec_settings() -> dict:
         "ssh_host": await db.get_setting("ssh_host", ""),
         "ssh_port": int(await db.get_setting("ssh_port", 22) or 22),
         "ssh_username": await db.get_setting("ssh_username", ""),
+        "ssh_os": await db.get_setting("ssh_os", "linux"),
         "ssh_auth": await db.get_setting("ssh_auth", "password"),
         "ssh_password": await db.get_setting("ssh_password", ""),
         "ssh_key": await db.get_setting("ssh_key", ""),
@@ -32,16 +33,21 @@ async def get_exec_settings() -> dict:
 
 def map_path(path: str, maps: list[dict]) -> str:
     """Translate a path as Plex reports it into a path the executor can open.
-    Longest matching prefix wins; no match means the path is used as-is."""
+    Longest matching prefix wins; no match means the path is used as-is.
+
+    Windows-style paths (a Plex server on Windows reports e.g. Z:\\Movies\\...)
+    are normalized to forward slashes and matched case-insensitively."""
+    norm = path.replace("\\", "/")
     best = None
     for m in maps or []:
-        src = (m.get("plex") or "").rstrip("/")
-        if src and (path == src or path.startswith(src + "/")):
+        src = (m.get("plex") or "").replace("\\", "/").rstrip("/")
+        if src and (norm.lower() == src.lower()
+                    or norm.lower().startswith(src.lower() + "/")):
             if best is None or len(src) > len(best[0]):
                 best = (src, (m.get("local") or "").rstrip("/"))
     if best is None:
         return path
-    return best[1] + path[len(best[0]):]
+    return best[1] + norm[len(best[0]):]
 
 
 class FfmpegProcess:
@@ -134,7 +140,8 @@ class LocalExecutor:
 
 class SSHExecutor:
     """Runs ffmpeg/ffprobe on the Plex server itself, authenticated with an
-    account or service account (password or private key)."""
+    account or service account (password or private key). Supports Linux
+    servers and Windows servers running OpenSSH (default cmd.exe shell)."""
     mode = "ssh"
 
     def __init__(self, cfg: dict):
@@ -146,11 +153,21 @@ class SSHExecutor:
         elif not cfg.get("ssh_password"):
             raise ExecError("SSH password authentication selected but no password saved.")
         self.cfg = cfg
+        self.windows = (cfg.get("ssh_os") or "linux") == "windows"
         self.maps = cfg.get("path_maps_ssh") or []
         self._conn = None
+        self._temp_dir: str | None = None
 
     def map(self, path: str) -> str:
         return map_path(path, self.maps)
+
+    def _cmd(self, argv: list[str]) -> str:
+        """Build a shell command string for the remote server's shell."""
+        if self.windows:
+            # cmd.exe: double-quote every arg; our args never contain quotes,
+            # and cmd doesn't interpret |, & or > inside double quotes
+            return " ".join(f'"{a}"' for a in argv)
+        return " ".join(shlex.quote(a) for a in argv)
 
     async def _connect(self):
         if self._conn is not None:
@@ -183,14 +200,16 @@ class SSHExecutor:
             raise ExecError(f"SSH connection failed: {e}") from e
         return self._conn
 
-    async def _run(self, argv: list[str], timeout: float = 120.0) -> tuple[int, str, str]:
+    async def _run_raw(self, cmd: str, timeout: float = 120.0) -> tuple[int, str, str]:
         conn = await self._connect()
-        cmd = " ".join(shlex.quote(a) for a in argv)
         try:
             result = await asyncio.wait_for(conn.run(cmd, check=False), timeout=timeout)
         except asyncio.TimeoutError:
-            raise ExecError(f"Remote command timed out: {argv[0]}")
+            raise ExecError(f"Remote command timed out: {cmd.split()[0]}")
         return result.exit_status, result.stdout or "", result.stderr or ""
+
+    async def _run(self, argv: list[str], timeout: float = 120.0) -> tuple[int, str, str]:
+        return await self._run_raw(self._cmd(argv), timeout)
 
     async def probe(self, path: str) -> dict:
         rc, out, err = await self._run(
@@ -201,18 +220,37 @@ class SSHExecutor:
         return json.loads(out)
 
     async def exists(self, path: str) -> bool:
-        rc, _, _ = await self._run(["test", "-e", path], timeout=30.0)
+        if self.windows:
+            rc, _, _ = await self._run_raw(f'if exist "{path}" (exit 0) else (exit 1)',
+                                           timeout=30.0)
+        else:
+            rc, _, _ = await self._run(["test", "-e", path], timeout=30.0)
         return rc == 0
 
     async def remove(self, path: str) -> None:
-        await self._run(["rm", "-f", path], timeout=30.0)
+        if self.windows:
+            await self._run_raw(f'del /f /q "{path}"', timeout=30.0)
+        else:
+            await self._run(["rm", "-f", path], timeout=30.0)
+
+    async def staging_path(self, name: str) -> str:
+        """A temp-file path on the remote server for staged uploads."""
+        if not self.windows:
+            return f"/tmp/{name}"
+        if self._temp_dir is None:
+            rc, out, _ = await self._run_raw("echo %TEMP%", timeout=30.0)
+            out = (out or "").strip()
+            # a non-cmd default shell echoes the literal %TEMP% back
+            self._temp_dir = out if rc == 0 and out and "%" not in out else r"C:\Windows\Temp"
+        return f"{self._temp_dir}\\{name}"
 
     async def put_file(self, local_path: str, dest_path: str) -> str:
         """Copy a staged file (e.g. an uploaded subtitle) to the Plex server."""
         conn = await self._connect()
         try:
             import asyncssh
-            await asyncssh.scp(local_path, (conn, dest_path))
+            # sftp on Windows OpenSSH wants forward slashes
+            await asyncssh.scp(local_path, (conn, dest_path.replace("\\", "/")))
         except Exception as e:
             raise ExecError(f"Could not copy file to the Plex server: {e}") from e
         return dest_path
@@ -233,7 +271,7 @@ class SSHExecutor:
 
     async def start_ffmpeg(self, argv: list[str]) -> FfmpegProcess:
         conn = await self._connect()
-        cmd = "ffmpeg " + " ".join(shlex.quote(a) for a in argv)
+        cmd = self._cmd(["ffmpeg"] + argv)
         proc = await conn.create_process(cmd, encoding=None)
 
         async def _wait():

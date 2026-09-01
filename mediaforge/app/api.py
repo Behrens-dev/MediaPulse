@@ -58,7 +58,7 @@ async def status():
 SETTING_KEYS = [
     "plex_url", "plex_token",
     "exec_mode",
-    "ssh_host", "ssh_port", "ssh_username", "ssh_auth",
+    "ssh_host", "ssh_port", "ssh_username", "ssh_os", "ssh_auth",
     "ssh_password", "ssh_key", "ssh_key_passphrase",
     "path_maps_local", "path_maps_ssh",
 ]
@@ -66,6 +66,7 @@ SETTING_KEYS = [
 DEFAULTS = {
     "exec_mode": "local",
     "ssh_port": 22,
+    "ssh_os": "linux",
     "ssh_auth": "password",
     "path_maps_local": [],
     "path_maps_ssh": [],
@@ -119,7 +120,7 @@ async def test_exec(payload: dict):
     """Check that ffmpeg/ffprobe are reachable in the chosen mode. Unsaved SSH
     fields in the payload override saved ones so 'Test' works before 'Save'."""
     cfg = await ex.get_exec_settings()
-    for k in ("ssh_host", "ssh_port", "ssh_username", "ssh_auth",
+    for k in ("ssh_host", "ssh_port", "ssh_username", "ssh_os", "ssh_auth",
               "ssh_password", "ssh_key", "ssh_key_passphrase"):
         v = payload.get(k)
         if v not in (None, ""):

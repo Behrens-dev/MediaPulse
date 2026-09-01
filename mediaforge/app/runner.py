@@ -91,7 +91,7 @@ class JobRunner:
                     if not os.path.exists(local):
                         raise ex.ExecError("The uploaded subtitle file is missing — re-queue the job.")
                     if job["mode"] == "ssh":
-                        staged_remote = f"/tmp/mediaforge_{job_id}_{staged_name}"
+                        staged_remote = await exec_.staging_path(f"mediaforge_{job_id}_{staged_name}")
                         note(f"copying subtitle to the Plex server: {staged_remote}")
                         sub_path = await exec_.put_file(local, staged_remote)
                     else:

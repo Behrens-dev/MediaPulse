@@ -28,7 +28,12 @@ Pick in **Settings → Where ffmpeg jobs run**:
 - **On the Plex server (SSH)** — jobs execute on the server that owns the files.
   Requires an account or service account with SSH access (password or private key)
   and ffmpeg installed on the server. MediaForge verifies credentials before saving and
-  has a *Test ffmpeg* button for both modes.
+  has a *Test ffmpeg* button for both modes. Both **Linux and Windows** Plex servers are
+  supported — pick the server OS in Settings. For Windows: install the built-in
+  *OpenSSH Server* feature (Settings → System → Optional features), leave the default
+  cmd.exe SSH shell as-is, and make sure `ffmpeg`/`ffprobe` are on the **system** PATH
+  (so the SSH session can find them). Plex on Windows reports paths like `Z:\Movies\...`,
+  which the SSH session sees identically — so usually **no path mappings are needed**.
 
 ## Run it
 

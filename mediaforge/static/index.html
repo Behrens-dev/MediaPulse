@@ -231,6 +231,12 @@
               <label>SSH host <input id="ssh-host" placeholder="192.168.1.50"></label>
               <label>SSH port <input type="number" id="ssh-port" value="22"></label>
               <label>Username (account / service account) <input id="ssh-username" placeholder="plexjobs" autocomplete="off"></label>
+              <label>Server operating system
+                <select id="ssh-os">
+                  <option value="linux">Linux</option>
+                  <option value="windows">Windows (OpenSSH)</option>
+                </select>
+              </label>
               <label>Authentication
                 <select id="ssh-auth">
                   <option value="password">Password</option>

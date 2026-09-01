@@ -22,12 +22,13 @@ def sanitize_suffix(suffix: str) -> str:
 
 
 def output_path(input_path: str, suffix: str) -> str:
-    """Same folder as the source, base name + required suffix, same extension."""
-    d = os.path.dirname(input_path)
-    base, ext = os.path.splitext(os.path.basename(input_path))
-    # keep forward slashes for remote (Linux) paths
-    sep = "/" if "/" in input_path else os.sep
-    return (d + sep if d else "") + base + suffix + ext
+    """Same folder as the source: insert the required suffix before the
+    extension. Separator-agnostic so Windows and POSIX paths both work."""
+    slash = max(input_path.rfind("/"), input_path.rfind("\\"))
+    dot = input_path.rfind(".")
+    if dot <= slash:  # no extension
+        dot = len(input_path)
+    return input_path[:dot] + suffix + input_path[dot:]
 
 
 def audio_streams(probe: dict) -> list[dict]:

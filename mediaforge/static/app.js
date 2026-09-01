@@ -559,6 +559,7 @@ async function loadSettings() {
     $("#ssh-host").value = s.ssh_host || "";
     $("#ssh-port").value = s.ssh_port || 22;
     $("#ssh-username").value = s.ssh_username || "";
+    $("#ssh-os").value = s.ssh_os || "linux";
     $("#ssh-auth").value = s.ssh_auth || "password";
     // secrets are never echoed back into the form; blank means "unchanged"
     $("#ssh-password").value = "";
@@ -595,7 +596,7 @@ function renderMaps() {
   const rows = mapState[mode];
   $("#map-rows").innerHTML = rows.map((m, i) => `
     <div class="map-row">
-      <input placeholder="Plex path prefix, e.g. /mnt/pool/media" value="${esc(m.plex || "")}" data-i="${i}" data-k="plex">
+      <input placeholder="Plex path prefix, e.g. Z:\\Media or /mnt/pool/media" value="${esc(m.plex || "")}" data-i="${i}" data-k="plex">
       <span class="arrow">→</span>
       <input placeholder="${mode === "ssh" ? "path on the Plex server" : "path in this container, e.g. /media"}" value="${esc(m.local || "")}" data-i="${i}" data-k="local">
       <button class="btn ghost small danger" data-i="${i}">✕</button>
@@ -619,6 +620,7 @@ function gatherSettings() {
     ssh_host: $("#ssh-host").value.trim(),
     ssh_port: parseInt($("#ssh-port").value, 10) || 22,
     ssh_username: $("#ssh-username").value.trim(),
+    ssh_os: $("#ssh-os").value,
     ssh_auth: $("#ssh-auth").value,
     path_maps_local: mapState.local.filter((m) => m.plex && m.local),
     path_maps_ssh: mapState.ssh.filter((m) => m.plex && m.local),
@@ -669,7 +671,7 @@ $("#exec-test").addEventListener("click", async () => {
     const r = await api.post("/api/settings/test-exec", {
       mode: s.exec_mode,
       ssh_host: s.ssh_host, ssh_port: s.ssh_port, ssh_username: s.ssh_username,
-      ssh_auth: s.ssh_auth, ssh_password: s.ssh_password || "",
+      ssh_os: s.ssh_os, ssh_auth: s.ssh_auth, ssh_password: s.ssh_password || "",
       ssh_key: s.ssh_key || "", ssh_key_passphrase: s.ssh_key_passphrase || "",
     });
     m.className = "msg " + (r.ok ? "ok" : "err");
