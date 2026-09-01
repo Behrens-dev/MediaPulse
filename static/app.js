@@ -1,4 +1,4 @@
-/* PlexPulse UI */
+/* MediaPulse UI */
 "use strict";
 
 const $ = (sel) => document.querySelector(sel);
@@ -87,7 +87,7 @@ const PAGE_TITLES = {
 
 function showPage(page) {
   currentPage = page;
-  $("#page-title").textContent = PAGE_TITLES[page] || "PlexPulse";
+  $("#page-title").textContent = PAGE_TITLES[page] || "MediaPulse";
   $$("nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
   $$(".page").forEach((p) => p.classList.toggle("hidden", p.id !== "page-" + page));
   if (page === "activity") loadActivity();
@@ -256,7 +256,7 @@ async function loadLibraries() {
           <div class="title">${icon} ${esc(l.title)}</div>
           <div class="stat-row" style="margin:10px 0">${counts}</div>
           <div class="sub">Lifetime plays: <b>${(l.plex_view_count + l.tracked_plays).toLocaleString()}</b>
-            (Plex: ${l.plex_view_count.toLocaleString()}, PlexPulse-tracked: ${l.tracked_plays.toLocaleString()})</div>
+            (Plex: ${l.plex_view_count.toLocaleString()}, MediaPulse-tracked: ${l.tracked_plays.toLocaleString()})</div>
           <div class="sub">${syncInfo}${l.syncing ? " · <b>syncing now…</b>" : ""}</div>
         </div>
       </div>`;
@@ -599,7 +599,7 @@ async function loadNotifySettings() {
   $("#smtp-pass").value = s.smtp_password || "";
   $("#smtp-security").value = s.smtp_security || "starttls";
   $("#smtp-from").value = s.smtp_from || "";
-  $("#smtp-from-name").value = s.smtp_from_name || "PlexPulse";
+  $("#smtp-from-name").value = s.smtp_from_name || "MediaPulse";
   $("#recipients").value = (s.recipients || []).join(", ");
   $("#alert-recipients").value = (s.alert_recipients || []).join(", ");
   $("#alert-enabled").checked = s.alert_server_down !== false;

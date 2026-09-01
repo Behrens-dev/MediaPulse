@@ -1,0 +1,22 @@
+services:
+  mediaforge:
+    build: .
+    image: mediaforge:latest
+    container_name: mediaforge
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    volumes:
+      - mediaforge-config:/config
+      # Mount your media so jobs can run inside this container ("local" mode),
+      # then add a path mapping in Settings (e.g. /mnt/pool/media -> /media).
+      # Not needed if jobs run on the Plex server over SSH.
+      # - /mnt/pool/media:/media
+    environment:
+      # Optional: pre-seed the Plex connection (can also be set in the UI)
+      - PLEX_URL=${PLEX_URL:-}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
+      - TZ=${TZ:-America/New_York}
+
+volumes:
+  mediaforge-config:

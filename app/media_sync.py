@@ -6,7 +6,7 @@ import time
 
 from . import db, plex
 
-log = logging.getLogger("plexpulse.sync")
+log = logging.getLogger("mediapulse.sync")
 
 # which leaf item type carries the files for each section type
 LEAF_TYPE = {

@@ -37,8 +37,8 @@ class PlexClient:
         return {
             "X-Plex-Token": self.token,
             "Accept": "application/json",
-            "X-Plex-Client-Identifier": "plexpulse",
-            "X-Plex-Product": "PlexPulse",
+            "X-Plex-Client-Identifier": "mediapulse",
+            "X-Plex-Product": "MediaPulse",
             "X-Plex-Version": "1.0",
         }
 
@@ -176,8 +176,8 @@ class PlexClient:
                 r = await client.get(
                     f"{PLEXTV}/api/users",
                     headers={"X-Plex-Token": self.token,
-                             "X-Plex-Client-Identifier": "plexpulse",
-                             "X-Plex-Product": "PlexPulse"},
+                             "X-Plex-Client-Identifier": "mediapulse",
+                             "X-Plex-Product": "MediaPulse"},
                     timeout=30.0,
                 )
             except httpx.HTTPError as e:
@@ -220,8 +220,8 @@ class PlexClient:
                 r = await client.get(
                     f"{PLEXTV}/api/v2/user",
                     headers={"X-Plex-Token": self.token, "Accept": "application/json",
-                             "X-Plex-Client-Identifier": "plexpulse",
-                             "X-Plex-Product": "PlexPulse"},
+                             "X-Plex-Client-Identifier": "mediapulse",
+                             "X-Plex-Product": "MediaPulse"},
                     timeout=30.0,
                 )
             except httpx.HTTPError as e:

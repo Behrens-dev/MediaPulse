@@ -1,9 +1,9 @@
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.source="https://github.com/Behrens-dev/PlexPulse"
-LABEL org.opencontainers.image.description="PlexPulse - Plex monitoring, library analytics, and notifications"
+LABEL org.opencontainers.image.source="https://github.com/Behrens-dev/MediaPulse"
+LABEL org.opencontainers.image.description="MediaPulse - Plex monitoring, library analytics, and notifications"
 
-WORKDIR /opt/plexpulse
+WORKDIR /opt/mediapulse
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY static ./static
 
-ENV PLEXPULSE_DATA=/config
+ENV MEDIAPULSE_DATA=/config
 VOLUME /config
 EXPOSE 8181
 

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaForge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232f6fed'/><path d='M42 30 L26 50 L42 70 M58 30 L74 50 L58 70' stroke='%23f0b429' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 100 100" width="30" height="30"><rect width="100" height="100" rx="24" fill="#2f6fed"/><path d="M42 30 L26 50 L42 70 M58 30 L74 50 L58 70" stroke="#f0b429" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-text">Media<span>Forge</span></div>
+    </div>
+
+    <nav>
+      <button data-page="convert" class="active">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        Convert
+      </button>
+      <button data-page="jobs">
+        <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        Jobs
+      </button>
+      <button data-page="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div id="mode-badge" class="badge mode">…</div>
+      <div id="server-badge" class="badge">…</div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <h1 id="page-title">Convert</h1>
+      <div id="topbar-info" class="muted"></div>
+    </header>
+
+    <main>
+      <!-- ============ CONVERT ============ -->
+      <section id="page-convert" class="page">
+        <div class="rec-search">
+          <input id="search-input" placeholder="Search your Plex library — movie, show, or episode…" autocomplete="off">
+          <div id="search-results" class="rec-results hidden"></div>
+        </div>
+
+        <div id="convert-empty" class="empty">Search for something in your library to get started.</div>
+
+        <div id="item-panel" class="panel hidden">
+          <div class="item-head">
+            <img id="item-poster" class="poster" alt="">
+            <div class="body">
+              <div class="title" id="item-title"></div>
+              <div id="episode-picker" class="hidden" style="margin-top:10px">
+                <label class="muted small">Episode
+                  <select id="episode-select" style="margin-left:8px; max-width:420px"></select>
+                </label>
+              </div>
+              <div id="part-picker" class="hidden" style="margin-top:10px">
+                <label class="muted small">File
+                  <select id="part-select" style="margin-left:8px; max-width:520px"></select>
+                </label>
+              </div>
+              <div class="file-line" id="item-file"></div>
+              <div id="probe-status" class="muted small" style="margin-top:8px"></div>
+            </div>
+          </div>
+
+          <div id="tracks-box" class="hidden" style="margin-top:18px">
+            <h3>Tracks in this file <span class="muted small" id="probe-source"></span></h3>
+            <div id="tracks-tables"></div>
+          </div>
+
+          <div id="actions-box" class="hidden" style="margin-top:22px">
+            <div class="tabs" id="action-tabs">
+              <button data-tab="downmix" class="active">Downmix audio</button>
+              <button data-tab="embed_sub">Embed subtitles</button>
+              <button data-tab="remove_audio">Remove audio</button>
+              <button data-tab="audio_sync">Audio ↔ video sync</button>
+              <button data-tab="sub_sync">Subtitle sync</button>
+            </div>
+
+            <!-- downmix -->
+            <div id="tab-downmix" class="tab-body">
+              <div class="opts" id="downmix-opts">
+                <label class="opt" data-preset="71_add">
+                  <input type="radio" name="dm-preset" value="71_add">
+                  <span><b>7.1 → add 5.1 + stereo</b>
+                  <span class="sub">Keeps every existing track and adds an AAC 5.1 downmix (384k) and an AAC stereo downmix (192k) made from the 7.1.</span></span>
+                </label>
+                <label class="opt" data-preset="51_add">
+                  <input type="radio" name="dm-preset" value="51_add">
+                  <span><b>5.1 → add stereo</b>
+                  <span class="sub">Keeps every existing track and adds an AAC stereo downmix (192k) made from the 5.1.</span></span>
+                </label>
+                <label class="opt" data-preset="71_only">
+                  <input type="radio" name="dm-preset" value="71_only">
+                  <span><b>Normalize to only 5.1 + stereo (drop the 7.1)</b>
+                  <span class="sub">Ends up with exactly one 5.1 and one stereo track — existing ones are kept, missing ones are downmixed, the 7.1 is dropped.</span></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- embed subtitle -->
+            <div id="tab-embed_sub" class="tab-body hidden">
+              <div class="form-grid">
+                <label>Subtitle file (.srt, .ass, .ssa, .vtt, .smi)
+                  <input type="file" id="sub-file" accept=".srt,.ass,.ssa,.vtt,.smi">
+                </label>
+                <label>…or a path on the server (used if no file is chosen above)
+                  <input id="sub-path" placeholder="/mnt/pool/media/Movies/Movie (2024)/Movie.srt">
+                </label>
+                <label>Track name — how it appears in Plex's subtitle menu
+                  <input id="sub-label" placeholder="English (SDH)">
+                </label>
+                <label>Language code <input id="sub-lang" value="eng" style="max-width:120px"></label>
+                <label class="chk"><input type="checkbox" id="sub-default"> Make it the default (on by default for viewers)</label>
+              </div>
+              <p class="muted small">Video and audio are copied byte-for-byte — no re-encode, no quality loss.
+              The track is selectable and off by default unless you check the box.</p>
+            </div>
+
+            <!-- remove audio -->
+            <div id="tab-remove_audio" class="tab-body hidden">
+              <p class="muted small">Uncheck the audio tracks you want removed. Everything else is copied untouched.</p>
+              <div class="opts" id="remove-list"></div>
+            </div>
+
+            <!-- audio sync -->
+            <div id="tab-audio_sync" class="tab-body hidden">
+              <div class="opts">
+                <label class="opt" data-asmode="auto">
+                  <input type="radio" name="as-mode" value="auto" checked>
+                  <span><b>Auto-repair drift</b>
+                  <span class="sub">Re-times the audio onto the video's timestamps (aresample async). Fixes audio that slowly drifts out of sync or has gaps. Audio is re-encoded to AAC; video is untouched.</span></span>
+                </label>
+                <label class="opt" data-asmode="offset">
+                  <input type="radio" name="as-mode" value="offset">
+                  <span><b>Shift by a fixed offset</b>
+                  <span class="sub">The whole audio track is early or late by the same amount. Pure remux — nothing is re-encoded.</span>
+                  <span style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                    <input type="number" id="as-offset" value="0" step="50" style="width:110px"> ms
+                    <span class="muted small">positive = audio plays later, negative = audio plays earlier</span>
+                  </span></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- subtitle sync -->
+            <div id="tab-sub_sync" class="tab-body hidden">
+              <p class="muted small">Shifts every embedded subtitle track by a fixed amount so captions line up with the audio. Pure remux — nothing is re-encoded.</p>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="number" id="ss-offset" value="0" step="50" style="width:110px"> ms
+                <span class="muted small">positive = subtitles appear later, negative = earlier</span>
+              </div>
+            </div>
+
+            <fieldset class="suffix-box">
+              <legend>Output file</legend>
+              <div class="muted small">Saved to the same folder as the original. A suffix is required so the
+              original is never overwritten.</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+                <span class="muted small">Suffix</span>
+                <input id="suffix" placeholder="_encoded" style="width:180px">
+              </div>
+              <div id="out-preview" class="out-preview"></div>
+            </fieldset>
+
+            <div class="btn-row">
+              <button class="btn primary" id="queue-btn">Queue job</button>
+            </div>
+            <div id="queue-msg" class="msg"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ JOBS ============ -->
+      <section id="page-jobs" class="page hidden">
+        <div class="page-head">
+          <div id="jobs-stats" class="stat-row"></div>
+          <button class="btn" id="jobs-refresh">Refresh</button>
+        </div>
+        <div id="jobs-table"></div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section id="page-settings" class="page hidden">
+        <div class="panel" style="max-width:720px">
+          <h3>Plex server</h3>
+          <div class="form-grid">
+            <label>Plex server URL <input id="plex-url" placeholder="http://192.168.1.50:32400"></label>
+            <label>Plex token (X-Plex-Token) <input id="plex-token" type="password" autocomplete="off"></label>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="plex-test">Test connection</button>
+          </div>
+          <div id="plex-msg" class="msg"></div>
+          <p class="muted small">Find your token: play any item in Plex Web → ⋮ → Get Info → View XML → the
+          <code>X-Plex-Token=</code> value in the URL.</p>
+        </div>
+
+        <div class="panel" style="max-width:720px">
+          <h3>Where ffmpeg jobs run</h3>
+          <div class="opts">
+            <label class="opt" data-mode="local">
+              <input type="radio" name="exec-mode" value="local">
+              <span><b>In the MediaForge container</b>
+              <span class="sub">ffmpeg ships with this container. Your media folders must be mounted into the
+              container and mapped below.</span></span>
+            </label>
+            <label class="opt" data-mode="ssh">
+              <input type="radio" name="exec-mode" value="ssh">
+              <span><b>On the Plex server (SSH)</b>
+              <span class="sub">Jobs run on the Plex server itself. Requires an account or service account
+              with SSH access and ffmpeg installed on the server.</span></span>
+            </label>
+          </div>
+
+          <div id="ssh-box" class="hidden" style="margin-top:16px">
+            <div class="form-grid two-col">
+              <label>SSH host <input id="ssh-host" placeholder="192.168.1.50"></label>
+              <label>SSH port <input type="number" id="ssh-port" value="22"></label>
+              <label>Username (account / service account) <input id="ssh-username" placeholder="plexjobs" autocomplete="off"></label>
+              <label>Authentication
+                <select id="ssh-auth">
+                  <option value="password">Password</option>
+                  <option value="key">Private key</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-grid">
+              <label id="ssh-pass-row">Password <input id="ssh-password" type="password" autocomplete="new-password" placeholder="(unchanged)"></label>
+              <label id="ssh-key-row" class="hidden">Private key (PEM / OpenSSH)
+                <textarea id="ssh-key" rows="4" class="mono" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;(unchanged if left blank)"></textarea>
+              </label>
+              <label id="ssh-phrase-row" class="hidden">Key passphrase (optional) <input id="ssh-key-passphrase" type="password" autocomplete="off"></label>
+            </div>
+          </div>
+
+          <div style="margin-top:18px">
+            <h3 style="margin-bottom:4px">Path mappings <span class="muted small" id="maps-mode-label"></span></h3>
+            <p class="muted small" style="margin-top:2px">Plex reports file paths as the Plex server sees them.
+            If they differ from what this mode sees, map the prefixes here (longest match wins).</p>
+            <div class="map-rows" id="map-rows"></div>
+            <button class="btn small" id="map-add">+ Add mapping</button>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn" id="exec-test">Test ffmpeg</button>
+            <button class="btn primary" id="settings-save">Save all settings</button>
+          </div>
+          <div id="exec-msg" class="msg"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- job log modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span id="modal-title"></span>
+        <button id="modal-close" class="btn ghost">✕</button>
+      </div>
+      <pre id="modal-log"></pre>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

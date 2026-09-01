@@ -6,7 +6,7 @@ import time
 from . import db, media_sync, plex, notify
 from .config import SESSION_POLL_SECONDS, HEALTH_POLL_SECONDS, HEALTH_FAILURE_THRESHOLD
 
-log = logging.getLogger("plexpulse.poller")
+log = logging.getLogger("mediapulse.poller")
 
 
 def parse_session(s: dict) -> dict:

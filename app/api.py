@@ -54,7 +54,7 @@ SETTING_KEYS = [
 ]
 
 DEFAULTS = {
-    "smtp_port": 587, "smtp_security": "starttls", "smtp_from_name": "PlexPulse",
+    "smtp_port": 587, "smtp_security": "starttls", "smtp_from_name": "MediaPulse",
     "recipients": [], "alert_recipients": [], "alert_server_down": True,
     "newsletter_enabled": False, "newsletter_day": 1, "newsletter_hour": 9,
     "newsletter_days_back": 30,

@@ -18,7 +18,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import db, plex
 
-log = logging.getLogger("plexpulse.notify")
+log = logging.getLogger("mediapulse.notify")
 
 _env = Environment(
     loader=FileSystemLoader(Path(__file__).parent / "templates"),
@@ -43,7 +43,7 @@ async def _smtp_settings() -> dict:
         "password": await db.get_setting("smtp_password", ""),
         "security": await db.get_setting("smtp_security", "starttls"),  # starttls | ssl | none
         "from_addr": await db.get_setting("smtp_from", ""),
-        "from_name": await db.get_setting("smtp_from_name", "PlexPulse"),
+        "from_name": await db.get_setting("smtp_from_name", "MediaPulse"),
     }
     if not s["host"] or not s["from_addr"]:
         raise NotifyError("SMTP is not configured yet — set it up under Notifications → Email settings.")
@@ -374,4 +374,4 @@ async def send_test(recipients: list[str] | None = None) -> list[str]:
         server=server, down=False, error="", test=True,
         when=time.strftime("%Y-%m-%d %H:%M:%S"),
     )
-    return await send_email("test", f"PlexPulse test email ({server})", html, recipients)
+    return await send_email("test", f"MediaPulse test email ({server})", html, recipients)
