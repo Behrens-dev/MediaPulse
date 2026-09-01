@@ -141,7 +141,9 @@ class LocalExecutor:
 class SSHExecutor:
     """Runs ffmpeg/ffprobe on the Plex server itself, authenticated with an
     account or service account (password or private key). Supports Linux
-    servers and Windows servers running OpenSSH (default cmd.exe shell)."""
+    servers and Windows servers running OpenSSH (cmd or PowerShell shell —
+    detected automatically). File checks/deletes/uploads go over SFTP, which
+    both platforms ship with, so they don't depend on the remote shell."""
     mode = "ssh"
 
     def __init__(self, cfg: dict):
@@ -156,7 +158,9 @@ class SSHExecutor:
         self.windows = (cfg.get("ssh_os") or "linux") == "windows"
         self.maps = cfg.get("path_maps_ssh") or []
         self._conn = None
+        self._sftp = None
         self._temp_dir: str | None = None
+        self._win_shell: str | None = None   # "cmd" | "powershell", detected once
 
     def map(self, path: str) -> str:
         return map_path(path, self.maps)
@@ -164,10 +168,28 @@ class SSHExecutor:
     def _cmd(self, argv: list[str]) -> str:
         """Build a shell command string for the remote server's shell."""
         if self.windows:
-            # cmd.exe: double-quote every arg; our args never contain quotes,
-            # and cmd doesn't interpret |, & or > inside double quotes
-            return " ".join(f'"{a}"' for a in argv)
+            # double-quote every arg; our args never contain quotes, and
+            # neither cmd nor PowerShell interpret | or & inside double quotes
+            quoted = " ".join(f'"{a}"' for a in argv)
+            # PowerShell needs the call operator to run a quoted command name
+            return ("& " + quoted) if self._win_shell == "powershell" else quoted
         return " ".join(shlex.quote(a) for a in argv)
+
+    async def _ensure_win_shell(self) -> None:
+        """Figure out (once) whether the Windows SSH shell is cmd or PowerShell,
+        and resolve the remote temp directory along the way."""
+        if not self.windows or self._win_shell is not None:
+            return
+        rc, out, _ = await self._run_raw("echo %TEMP%", timeout=30.0)
+        out = (out or "").strip()
+        if rc == 0 and out and "%" not in out:
+            self._win_shell = "cmd"
+            self._temp_dir = out
+        else:
+            self._win_shell = "powershell"
+            rc, out, _ = await self._run_raw("echo $env:TEMP", timeout=30.0)
+            out = (out or "").strip()
+            self._temp_dir = out if rc == 0 and out else "C:\\Windows\\Temp"
 
     async def _connect(self):
         if self._conn is not None:
@@ -209,7 +231,22 @@ class SSHExecutor:
         return result.exit_status, result.stdout or "", result.stderr or ""
 
     async def _run(self, argv: list[str], timeout: float = 120.0) -> tuple[int, str, str]:
+        await self._ensure_win_shell()
         return await self._run_raw(self._cmd(argv), timeout)
+
+    async def _sftp_client(self):
+        if self._sftp is None:
+            conn = await self._connect()
+            try:
+                self._sftp = await conn.start_sftp_client()
+            except Exception as e:
+                raise ExecError(f"Could not start SFTP on the server: {e}") from e
+        return self._sftp
+
+    @staticmethod
+    def _sftp_path(path: str) -> str:
+        """Windows OpenSSH's SFTP server wants forward slashes."""
+        return path.replace("\\", "/")
 
     async def probe(self, path: str) -> dict:
         rc, out, err = await self._run(
@@ -220,37 +257,31 @@ class SSHExecutor:
         return json.loads(out)
 
     async def exists(self, path: str) -> bool:
-        if self.windows:
-            rc, _, _ = await self._run_raw(f'if exist "{path}" (exit 0) else (exit 1)',
-                                           timeout=30.0)
-        else:
-            rc, _, _ = await self._run(["test", "-e", path], timeout=30.0)
-        return rc == 0
+        sftp = await self._sftp_client()
+        try:
+            return await sftp.exists(self._sftp_path(path))
+        except Exception as e:
+            raise ExecError(f"Could not check {path} over SFTP: {e}") from e
 
     async def remove(self, path: str) -> None:
-        if self.windows:
-            await self._run_raw(f'del /f /q "{path}"', timeout=30.0)
-        else:
-            await self._run(["rm", "-f", path], timeout=30.0)
+        sftp = await self._sftp_client()
+        try:
+            await sftp.remove(self._sftp_path(path))
+        except Exception:
+            pass
 
     async def staging_path(self, name: str) -> str:
         """A temp-file path on the remote server for staged uploads."""
         if not self.windows:
             return f"/tmp/{name}"
-        if self._temp_dir is None:
-            rc, out, _ = await self._run_raw("echo %TEMP%", timeout=30.0)
-            out = (out or "").strip()
-            # a non-cmd default shell echoes the literal %TEMP% back
-            self._temp_dir = out if rc == 0 and out and "%" not in out else r"C:\Windows\Temp"
+        await self._ensure_win_shell()
         return f"{self._temp_dir}\\{name}"
 
     async def put_file(self, local_path: str, dest_path: str) -> str:
         """Copy a staged file (e.g. an uploaded subtitle) to the Plex server."""
-        conn = await self._connect()
+        sftp = await self._sftp_client()
         try:
-            import asyncssh
-            # sftp on Windows OpenSSH wants forward slashes
-            await asyncssh.scp(local_path, (conn, dest_path.replace("\\", "/")))
+            await sftp.put(local_path, self._sftp_path(dest_path))
         except Exception as e:
             raise ExecError(f"Could not copy file to the Plex server: {e}") from e
         return dest_path
@@ -271,6 +302,7 @@ class SSHExecutor:
 
     async def start_ffmpeg(self, argv: list[str]) -> FfmpegProcess:
         conn = await self._connect()
+        await self._ensure_win_shell()
         cmd = self._cmd(["ffmpeg"] + argv)
         proc = await conn.create_process(cmd, encoding=None)
 
