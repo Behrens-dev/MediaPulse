@@ -10,7 +10,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from . import db, executor as ex, ffmpeg_cmd, plex
-from .config import UPLOADS_DIR
+from .config import APP_VERSION, UPLOADS_DIR
 from .runner import runner
 
 router = APIRouter(prefix="/api")
@@ -45,6 +45,7 @@ async def status():
     ) as cur:
         counts = {r["status"]: r["n"] for r in await cur.fetchall()}
     return {
+        "version": APP_VERSION,
         "configured": client.configured,
         "plex_ok": plex_ok,
         "plex_error": plex_error,
@@ -244,12 +245,18 @@ async def probe(payload: dict):
         raise _bad("No file path given.")
     exec_ = None
     try:
-        exec_ = await ex.get_executor()
+        cfg = await ex.get_exec_settings()
+        exec_ = await ex.get_executor(cfg)
         mapped = exec_.map(path)
+        if exec_.mode == "ssh":
+            where = (f"over SFTP on {cfg.get('ssh_host')} "
+                     f"(server OS: {cfg.get('ssh_os', 'linux')})")
+        else:
+            where = "inside the MediaForge container (local mode)"
         if not await exec_.exists(mapped):
             return {"ok": False, "mapped_path": mapped, "mode": exec_.mode,
-                    "error": f"File not found at {mapped}. If the path looks wrong, "
-                             "add a path mapping in Settings."}
+                    "error": f"File not found at {mapped} — checked {where}. "
+                             "If the mode or path looks wrong, fix it in Settings."}
         data = await exec_.probe(mapped)
         return {
             "ok": True,

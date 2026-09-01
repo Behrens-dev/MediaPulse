@@ -90,7 +90,9 @@ async function refreshStatus() {
     if (!s.configured) { b.textContent = "⚙ Plex not configured"; b.className = "badge"; }
     else if (s.plex_ok) { b.textContent = "● " + (s.server.name || "Plex up"); b.className = "badge up"; }
     else { b.textContent = "● Plex unreachable"; b.className = "badge down"; }
-    $("#mode-badge").textContent = s.mode === "ssh" ? "⚡ runs on Plex server" : "⚡ runs in container";
+    $("#mode-badge").textContent =
+      (s.mode === "ssh" ? "⚡ runs on Plex server" : "⚡ runs in container")
+      + (s.version ? " · v" + s.version : "");
     const running = s.jobs.running || 0, queued = s.jobs.queued || 0;
     $("#topbar-info").textContent =
       running || queued ? `${running} running · ${queued} queued` : "";
