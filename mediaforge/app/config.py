@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.5.1"
 
 # baked in by the GitHub Actions build (--build-arg GIT_SHA=...); empty in dev
 GIT_SHA = os.environ.get("GIT_SHA", "")

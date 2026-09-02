@@ -107,6 +107,15 @@ class LocalExecutor:
         except OSError:
             pass
 
+    async def read_file(self, path: str, max_bytes: int = 10 * 1024 * 1024) -> bytes:
+        def _read():
+            with open(path, "rb") as f:
+                return f.read(max_bytes)
+        try:
+            return await asyncio.to_thread(_read)
+        except OSError as e:
+            raise ExecError(f"Could not read {path}: {e}") from e
+
     async def put_file(self, local_path: str, dest_path: str) -> str:
         """Local mode: the staged file is already on this filesystem."""
         return local_path
@@ -316,6 +325,17 @@ class SSHExecutor:
             return f"/tmp/{name}"
         await self._ensure_win_shell()
         return f"{self._temp_dir}\\{name}"
+
+    async def read_file(self, path: str, max_bytes: int = 10 * 1024 * 1024) -> bytes:
+        sftp = await self._sftp_client()
+        last_err: Exception | None = None
+        for form in self._sftp_forms(path):
+            try:
+                async with sftp.open(form, "rb") as f:
+                    return await f.read(max_bytes)
+            except Exception as e:
+                last_err = e
+        raise ExecError(f"Could not read {path}: {last_err}")
 
     async def put_file(self, local_path: str, dest_path: str) -> str:
         """Copy a staged file (e.g. an uploaded subtitle) to the Plex server."""

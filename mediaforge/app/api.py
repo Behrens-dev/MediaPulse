@@ -351,6 +351,13 @@ async def create_job(payload: dict):
                     raise _bad("Could not decode the uploaded subtitle file.")
                 if len(raw) > SUB_UPLOAD_MAX:
                     raise _bad("Subtitle file too large (max 10 MB).")
+                # ffmpeg wants UTF-8; quietly convert non-UTF-8 ("ANSI"/UTF-16) uploads
+                enc = ffmpeg_cmd.detect_sub_encoding(raw)
+                if enc:
+                    try:
+                        raw = raw.decode(enc, errors="replace").encode("utf-8")
+                    except (LookupError, UnicodeError):
+                        pass  # leave as-is; ffmpeg will report if it truly can't
                 staged = f"{uuid.uuid4().hex}{ext}"
                 (UPLOADS_DIR / staged).write_bytes(raw)
                 options["staged_sub"] = staged
@@ -359,6 +366,15 @@ async def create_job(payload: dict):
                 sub_path = exec_.map(options["sub_path"])
                 if not await exec_.exists(sub_path):
                     raise _bad(f"Subtitle file not found at {sub_path}.")
+                # can't rewrite a file that lives on the server — tell ffmpeg
+                # the charset instead when it isn't UTF-8
+                try:
+                    raw = await exec_.read_file(sub_path)
+                    enc = ffmpeg_cmd.detect_sub_encoding(raw)
+                    if enc:
+                        options["sub_charenc"] = enc
+                except ex.ExecError:
+                    pass  # detection is best-effort; the job may still succeed
             else:
                 raise _bad("Provide a subtitle file — upload one or give its path.")
 

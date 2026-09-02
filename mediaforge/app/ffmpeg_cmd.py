@@ -391,6 +391,19 @@ def build_convert(probe: dict, input_path: str, out_path: str, options: dict) ->
 
 # ---------- subtitle embed ----------
 
+def detect_sub_encoding(raw: bytes) -> str | None:
+    """None when the text is already UTF-8 (what ffmpeg expects); otherwise the
+    encoding to decode it with. Non-UTF-8 'ANSI' srt files are extremely common
+    and make ffmpeg fail with 'Invalid UTF-8 in decoded subtitles text'."""
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return "UTF-16"
+    try:
+        raw.decode("utf-8")
+        return None  # valid UTF-8 (a BOM is fine too)
+    except UnicodeDecodeError:
+        return "cp1252"  # Windows "ANSI" — the usual culprit
+
+
 def build_embed_sub(probe: dict, input_path: str, out_path: str, options: dict,
                     sub_path: str) -> list[str]:
     """Add a subtitle file as a soft (selectable) track. Video/audio are copied
@@ -403,9 +416,13 @@ def build_embed_sub(probe: dict, input_path: str, out_path: str, options: dict,
     existing = subtitle_streams(probe)
     new_idx = len(existing)  # output subtitle-relative index of the new track
 
-    argv = _prefix(input_path) + ["-i", sub_path,
-                                  "-map", "0:v", "-map", "0:a", "-map", "0:s?", "-map", "1:0",
-                                  "-c:v", "copy", "-c:a", "copy"]
+    argv = _prefix(input_path)
+    if options.get("sub_charenc"):
+        # input option for the FOLLOWING -i: decode the subtitle with this charset
+        argv += ["-sub_charenc", options["sub_charenc"]]
+    argv += ["-i", sub_path,
+             "-map", "0:v", "-map", "0:a", "-map", "0:s?", "-map", "1:0",
+             "-c:v", "copy", "-c:a", "copy"]
     if container == ".mp4":
         # MP4 only supports mov_text for text subtitles
         argv += ["-c:s", "mov_text"]

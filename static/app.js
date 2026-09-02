@@ -288,9 +288,30 @@ function applySorts() {
   window._mT = setTimeout(loadMedia, 250);
 }
 
+function positionSortPop() {
+  // keep the popover on-screen whichever side of the row the button ends up on
+  const pop = $("#m-sort-pop");
+  pop.style.left = "0";
+  pop.style.right = "auto";
+  const r = pop.getBoundingClientRect();
+  if (r.right > window.innerWidth - 10) {
+    pop.style.left = "auto";
+    pop.style.right = "0";
+    if (pop.getBoundingClientRect().left < 10) {
+      // still clipped (very narrow screens): pin to the viewport's left edge
+      pop.style.right = "auto";
+      pop.style.left = `${-r.left + 10}px`;
+    }
+  }
+}
+
 $("#m-sort-btn").addEventListener("click", () => {
-  $("#m-sort-pop").classList.toggle("hidden");
-  renderSortRows();
+  const pop = $("#m-sort-pop");
+  pop.classList.toggle("hidden");
+  if (!pop.classList.contains("hidden")) {
+    renderSortRows();
+    positionSortPop();
+  }
 });
 $("#m-sort-close").addEventListener("click", () => $("#m-sort-pop").classList.add("hidden"));
 $("#m-sort-add").addEventListener("click", () => {
