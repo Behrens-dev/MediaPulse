@@ -345,8 +345,10 @@
           <label class="chk"><input type="checkbox" id="update-check-enabled" checked>
             Check for new versions every Sunday at midnight</label>
           <p class="muted small">Only a notice in the sidebar — nothing updates by itself.
-          To update, stop and start the app in TrueNAS (with <code>pull_policy: always</code>
-          it pulls the newest image on start).</p>
+          To update: on <b>TrueNAS</b>, stop and start the app (with
+          <code>pull_policy: always</code> it pulls the newest image on start). On
+          <b>plain Docker</b>, run <code>docker compose pull</code> then
+          <code>docker compose up -d</code> (a plain restart won't re-pull).</p>
           <div class="btn-row">
             <button class="btn" id="update-check-now">Check now</button>
           </div>

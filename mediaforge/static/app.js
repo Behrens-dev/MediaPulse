@@ -114,7 +114,7 @@ async function refreshStatus() {
     const showU = s.update && s.update.enabled && s.update.available;
     u.classList.toggle("hidden", !showU);
     if (showU) u.title = `Running ${s.update.current}, latest is ${s.update.latest}. ` +
-      "Stop and start the app in TrueNAS to update.";
+      "Update: stop/start the app on TrueNAS, or `docker compose pull && docker compose up -d` on plain Docker.";
     const running = s.jobs.running || 0, queued = s.jobs.queued || 0;
     $("#topbar-info").textContent =
       running || queued ? `${running} running · ${queued} queued` : "";
@@ -829,7 +829,7 @@ $("#update-check-now").addEventListener("click", async () => {
     else if (r.available) {
       m.className = "msg ok";
       m.textContent = `Update available — running ${r.current}, latest is ${r.latest}. ` +
-        "Stop and start the app to update.";
+        "Restart the app with a freshly pulled image to update (see above).";
     } else if (r.error) { m.className = "msg err"; m.textContent = r.error; }
     else { m.className = "msg ok"; m.textContent = `Up to date (${r.current}).`; }
     refreshStatus();

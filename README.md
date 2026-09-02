@@ -6,7 +6,7 @@ but they are **two separate applications**, shipped as **two separate Docker con
 
 | App | What it does | Port | Image |
 | --- | --- | --- | --- |
-| **[MediaPulse](#mediapulse)** (this folder) | Tautulli-style **monitoring & notifications**: live activity, watch history, per-file audio-track analysis, email newsletters/alerts | `8181` | `ghcr.io/behrens-dev/mediapulse:latest` |
+| **[MediaPulse](#mediapulse)** (this folder) | Plex **monitoring & notifications**: live activity, watch history, per-file audio-track analysis, email newsletters/alerts | `8181` | `ghcr.io/behrens-dev/mediapulse:latest` |
 | **[MediaForge](mediaforge/README.md)** (`mediaforge/`) | **ffmpeg toolbox**: downmix 7.1 → 5.1/stereo, embed subtitles, remove audio tracks, repair audio/subtitle sync — run against files straight out of your Plex library | `8191` | `ghcr.io/behrens-dev/mediaforge:latest` |
 
 They work great together — MediaPulse's audio-track analysis *finds* the files that need
@@ -45,9 +45,9 @@ firewall/VPN/reverse proxy), a single Plex server, and SMTP email for notificati
 
 # MediaPulse
 
-A 100% free self-hosted Plex monitoring and notification app — a Tautulli-style dashboard with the
-extra features Tautulli doesn't have. Runs as a single lightweight Docker container,
-designed for TrueNAS SCALE.
+A 100% free self-hosted Plex monitoring and notification app — a live dashboard of who's
+watching what, deep per-file media info, and family-friendly email notifications.
+Runs as a single lightweight Docker container, designed for TrueNAS SCALE.
 
 ## Features
 
@@ -68,9 +68,9 @@ designed for TrueNAS SCALE.
   - Filter the library for things like *"MKVs with a TrueHD 7.1 track but no 2.0 track"* or
     *"anything with only AC3"* — perfect for planning ffmpeg re-encodes (then queue them
     in [MediaForge](mediaforge/README.md)).
-  - **Multi-level sorting** (Airtable-style): stack sort rules like *file size high → low,
-    then title A → Z* across title, size, added date, bitrate, resolution, container,
-    video codec, audio channels, year, and duration.
+  - **Multi-level sorting**: stack sort rules like *file size high → low, then title
+    A → Z* across title, size, added date, bitrate, resolution, container, video codec,
+    audio channels, year, and duration.
 
 **✉️ Notifications** (SMTP email, works with Gmail app passwords, etc.)
 - **Recently added** — digest with poster art. Movies show poster + summary; TV shows show the
@@ -95,9 +95,10 @@ designed for TrueNAS SCALE.
 **🔔 Update notice** (both apps)
 - Every Sunday at midnight the app compares the commit it was built from against this
   repo's `main` branch; when a newer image exists, an "⬆ Update available" badge appears
-  in the sidebar. Purely informational — updating is still a manual stop/start of the app
-  (with `pull_policy: always`). A Settings toggle disables the check entirely, and a
-  "Check now" button runs it on demand.
+  in the sidebar. Purely informational — nothing updates by itself. To update on TrueNAS,
+  stop/start the app (with `pull_policy: always`); on plain Docker run
+  `docker compose pull && docker compose up -d` (a plain restart never re-pulls). A
+  Settings toggle disables the check entirely, and a "Check now" button runs it on demand.
 
 **💾 Backup & restore**
 - One-click JSON backup of all settings (Plex connection, email config, schedules, alert
@@ -191,7 +192,7 @@ variables (all optional):
   `PLEXPULSE_*` environment variables are still recognized. After renaming the GitHub repo,
   point the TrueNAS app at the new image name (`ghcr.io/behrens-dev/mediapulse:latest`).
 - **Lifetime plays** shown per library combine Plex's own `viewCount` (captured during media
-  sync) with plays MediaPulse has recorded itself. Tautulli-style history starts accumulating
+  sync) with plays MediaPulse has recorded itself. Watch history starts accumulating
   from the moment MediaPulse is running — it cannot see plays from before it was installed.
 - Watch history is recorded by polling `/status/sessions`; a play shorter than the poll
   interval (15 s) can be missed.

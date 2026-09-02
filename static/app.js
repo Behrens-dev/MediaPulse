@@ -125,7 +125,7 @@ async function refreshStatus() {
     const show = s.update && s.update.enabled && s.update.available;
     u.classList.toggle("hidden", !show);
     if (show) u.title = `Running ${s.update.current}, latest is ${s.update.latest}. ` +
-      "Stop and start the app in TrueNAS to update.";
+      "Update: stop/start the app on TrueNAS, or `docker compose pull && docker compose up -d` on plain Docker.";
   } catch { /* ignore */ }
 }
 
@@ -242,7 +242,7 @@ window.hPage = (dir) => { hState.offset += dir * hState.limit; loadHistory(); };
 let currentLib = null;
 const mState = { offset: 0, limit: 50, sorts: [] };
 
-/* ---------- multi-level sort (Airtable-style) ---------- */
+/* ---------- multi-level sort ---------- */
 
 const SORT_FIELDS = [
   ["title", "Title"], ["added", "Added"], ["year", "Year"], ["size", "File size"],
@@ -804,7 +804,7 @@ $("#update-check-now").addEventListener("click", async () => {
     if (!r.ok) { m.textContent = r.error; m.className = "msg err"; }
     else if (r.available) {
       m.textContent = `Update available — running ${r.current}, latest is ${r.latest}. ` +
-        "Stop and start the app to update.";
+        "Restart the app with a freshly pulled image to update (see above).";
       m.className = "msg ok";
     } else if (r.error) { m.textContent = r.error; m.className = "msg err"; }
     else { m.textContent = `Up to date (${r.current}).`; m.className = "msg ok"; }

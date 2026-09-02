@@ -34,8 +34,9 @@ a chosen date & time — stack up several held jobs and they all release at that
 started early or canceled from the Jobs page.
 
 **Update notice:** every Sunday at midnight the app checks whether a newer image has been
-published (sidebar badge only — updating stays a manual stop/start). Toggle it off in
-Settings, or use "Check now".
+published (sidebar badge only — nothing updates by itself). To update on TrueNAS,
+stop/start the app; on plain Docker run `docker compose pull && docker compose up -d`.
+Toggle the check off in Settings, or use "Check now".
 
 ## Where jobs run
 
