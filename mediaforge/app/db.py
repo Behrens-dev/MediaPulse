@@ -24,17 +24,23 @@ CREATE TABLE IF NOT EXISTS jobs (
     suffix TEXT NOT NULL,
     options TEXT NOT NULL,          -- json blob of job options
     mode TEXT NOT NULL,             -- local / ssh (captured when queued)
-    status TEXT NOT NULL DEFAULT 'queued',  -- queued / running / done / error / canceled
+    status TEXT NOT NULL DEFAULT 'queued',  -- queued / scheduled / running / done / error / canceled
     progress REAL DEFAULT 0,
     log TEXT DEFAULT '',
     error TEXT DEFAULT '',
     duration_ms INTEGER DEFAULT 0,
+    run_at INTEGER,                 -- epoch seconds; only for status 'scheduled'
     created_at INTEGER NOT NULL,
     started_at INTEGER,
     finished_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 """
+
+# columns added after the first release; applied to existing databases on startup
+MIGRATIONS = [
+    ("jobs", "run_at", "ALTER TABLE jobs ADD COLUMN run_at INTEGER"),
+]
 
 _db: aiosqlite.Connection | None = None
 
@@ -45,6 +51,11 @@ async def get_db() -> aiosqlite.Connection:
         _db = await aiosqlite.connect(DB_PATH)
         _db.row_factory = aiosqlite.Row
         await _db.executescript(SCHEMA)
+        for table, column, ddl in MIGRATIONS:
+            async with _db.execute(f"PRAGMA table_info({table})") as cur:
+                cols = {r["name"] for r in await cur.fetchall()}
+            if column not in cols:
+                await _db.execute(ddl)
         await _db.commit()
     return _db
 
@@ -79,14 +90,15 @@ async def set_setting(key: str, value: Any) -> None:
 
 async def create_job(kind: str, title: str, rating_key: str, plex_path: str,
                      input_path: str, output_path: str, suffix: str,
-                     options: dict, mode: str, duration_ms: int) -> int:
+                     options: dict, mode: str, duration_ms: int,
+                     status: str = "queued", run_at: int | None = None) -> int:
     db = await get_db()
     cur = await db.execute(
         """INSERT INTO jobs(kind, title, rating_key, plex_path, input_path, output_path,
-                            suffix, options, mode, duration_ms, created_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                            suffix, options, mode, duration_ms, status, run_at, created_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (kind, title, rating_key, plex_path, input_path, output_path,
-         suffix, json.dumps(options), mode, duration_ms, int(time.time())),
+         suffix, json.dumps(options), mode, duration_ms, status, run_at, int(time.time())),
     )
     await db.commit()
     return cur.lastrowid
@@ -102,9 +114,21 @@ async def list_jobs(limit: int = 100) -> list[aiosqlite.Row]:
     db = await get_db()
     async with db.execute(
         "SELECT id, kind, title, plex_path, output_path, mode, status, progress, error, "
-        "created_at, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT ?", (limit,)
+        "run_at, created_at, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT ?",
+        (limit,)
     ) as cur:
         return await cur.fetchall()
+
+
+async def release_due_jobs() -> int:
+    """Promote scheduled jobs whose start time has arrived into the queue."""
+    db = await get_db()
+    cur = await db.execute(
+        "UPDATE jobs SET status = 'queued' WHERE status = 'scheduled' AND run_at <= ?",
+        (int(time.time()),),
+    )
+    await db.commit()
+    return cur.rowcount
 
 
 async def next_queued_job() -> aiosqlite.Row | None:

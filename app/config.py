@@ -16,6 +16,10 @@ DB_PATH = _LEGACY_DB if _LEGACY_DB.exists() else DATA_DIR / "mediapulse.db"
 HOST = _env("MEDIAPULSE_HOST", "PLEXPULSE_HOST", "0.0.0.0")
 PORT = int(_env("MEDIAPULSE_PORT", "PLEXPULSE_PORT", "8181"))
 
+# baked in by the GitHub Actions build (--build-arg GIT_SHA=...); empty in dev
+GIT_SHA = os.environ.get("GIT_SHA", "")
+UPDATE_REPO = os.environ.get("UPDATE_REPO", "Behrens-dev/MediaPulse")
+
 # Optional initial values; once saved from the UI, the DB wins.
 ENV_PLEX_URL = os.environ.get("PLEX_URL", "")
 ENV_PLEX_TOKEN = os.environ.get("PLEX_TOKEN", "")

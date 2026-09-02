@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import db, update_check
 from .api import router
 from .config import ensure_data_dir
 from .runner import runner
@@ -29,9 +29,13 @@ async def lifespan(app: FastAPI):
         "UPDATE jobs SET status='error', error='Interrupted by a MediaForge restart' "
         "WHERE status='running'")
     await conn.commit()
-    worker = asyncio.create_task(runner.run())
+    tasks = [
+        asyncio.create_task(runner.run()),
+        asyncio.create_task(update_check.run()),
+    ]
     yield
-    worker.cancel()
+    for t in tasks:
+        t.cancel()
     await db.close_db()
 
 

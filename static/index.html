@@ -51,6 +51,7 @@
     </nav>
 
     <div class="sidebar-foot">
+      <div id="update-badge" class="badge update hidden" title="">⬆ Update available</div>
       <div id="server-badge" class="badge">…</div>
     </div>
   </aside>
@@ -146,6 +147,14 @@
               <option value="8">7.1</option>
             </select>
             <label class="chk"><input type="checkbox" id="m-missing-stereo"> Missing stereo track</label>
+            <div class="sort-wrap">
+              <button class="btn" id="m-sort-btn">Sort</button>
+              <div id="m-sort-pop" class="sort-pop hidden">
+                <div class="sort-head">Sort <button class="btn ghost small" id="m-sort-close">✕</button></div>
+                <div id="m-sort-rows"></div>
+                <button class="btn ghost small" id="m-sort-add">+ Add another sort</button>
+              </div>
+            </div>
           </div>
           <div id="media-table"></div>
           <div id="media-pager" class="pager"></div>
@@ -348,6 +357,19 @@
           <div id="settings-msg" class="msg"></div>
           <p class="muted small">Find your token: play any item in Plex Web → ⋮ → Get Info → View XML → the
           <code>X-Plex-Token=</code> value in the URL.</p>
+        </div>
+
+        <div class="panel" style="max-width:680px; margin-top:16px">
+          <h3 style="margin:0 0 10px">Updates</h3>
+          <label class="chk"><input type="checkbox" id="update-check-enabled" checked>
+            Check for new versions every Sunday at midnight</label>
+          <p class="muted small">Only a notice in the sidebar — nothing updates by itself.
+          To update, stop and start the app in TrueNAS (with <code>pull_policy: always</code>
+          it pulls the newest image on start).</p>
+          <div class="btn-row">
+            <button class="btn" id="update-check-now">Check now</button>
+          </div>
+          <div id="update-msg" class="msg"></div>
         </div>
       </section>
     </main>

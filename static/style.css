@@ -84,6 +84,11 @@ code { background: var(--panel2); border: 1px solid var(--border-soft); padding:
 }
 .badge.up { color: var(--green); border-color: rgba(62, 207, 142, .35); }
 .badge.down { color: var(--red); border-color: rgba(240, 86, 79, .4); }
+.badge.update {
+  color: var(--gold); border-color: rgba(240, 180, 41, .5); background: var(--gold-dim);
+  box-shadow: 0 0 12px rgba(240, 180, 41, .15); cursor: help;
+}
+.sidebar-foot { display: flex; flex-direction: column; gap: 6px; }
 
 /* ---------- layout ---------- */
 .content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -228,6 +233,24 @@ td .sub { color: var(--muted); font-size: 11.5px; }
 .audio-chip.surround { border-color: rgba(77, 134, 245, .45); color: var(--blue-soft); background: var(--blue-dim); }
 
 .pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 16px; color: var(--muted); font-size: 13px; }
+
+/* ---------- multi-level sort popover ---------- */
+.sort-wrap { position: relative; }
+.sort-wrap .btn.sorting { border-color: var(--gold); color: var(--gold); }
+.sort-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px; min-width: 340px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .55);
+}
+.sort-head {
+  display: flex; justify-content: space-between; align-items: center;
+  color: #fff; font-weight: 600; font-size: 13px; margin-bottom: 10px;
+}
+.sort-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sort-row select { background: var(--panel); }
+.sort-row .sort-field { flex: 1; }
+.sort-empty { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
 
 /* ---------- library summary ---------- */
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 14px 0 18px; }

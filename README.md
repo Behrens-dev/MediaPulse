@@ -68,6 +68,9 @@ designed for TrueNAS SCALE.
   - Filter the library for things like *"MKVs with a TrueHD 7.1 track but no 2.0 track"* or
     *"anything with only AC3"* — perfect for planning ffmpeg re-encodes (then queue them
     in [MediaForge](mediaforge/README.md)).
+  - **Multi-level sorting** (Airtable-style): stack sort rules like *file size high → low,
+    then title A → Z* across title, size, added date, bitrate, resolution, container,
+    video codec, audio channels, year, and duration.
 
 **✉️ Notifications** (SMTP email, works with Gmail app passwords, etc.)
 - **Recently added** — digest with poster art. Movies show poster + summary; TV shows show the
@@ -88,6 +91,13 @@ designed for TrueNAS SCALE.
 - Everyone with access to your server (owner, shared users, Plex Home/managed users) with
   their email, library access, play counts, and last-watched — plus an alias field so you can
   note who's actually who.
+
+**🔔 Update notice** (both apps)
+- Every Sunday at midnight the app compares the commit it was built from against this
+  repo's `main` branch; when a newer image exists, an "⬆ Update available" badge appears
+  in the sidebar. Purely informational — updating is still a manual stop/start of the app
+  (with `pull_policy: always`). A Settings toggle disables the check entirely, and a
+  "Check now" button runs it on demand.
 
 **💾 Backup & restore**
 - One-click JSON backup of all settings (Plex connection, email config, schedules, alert

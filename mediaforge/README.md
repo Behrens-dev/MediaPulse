@@ -28,6 +28,15 @@ suffix** (e.g. `_encoded`) so the original can never be overwritten and names ne
 collide. Partial output is deleted automatically if a job fails or is canceled. The
 **Jobs** page shows live progress, full ffmpeg logs, cancel, and retry.
 
+**Run now or schedule:** each job can run immediately (next in queue) or be *held until*
+a chosen date & time — stack up several held jobs and they all release at that moment
+(e.g. overnight), still running one at a time in the order queued. Scheduled jobs can be
+started early or canceled from the Jobs page.
+
+**Update notice:** every Sunday at midnight the app checks whether a newer image has been
+published (sidebar badge only — updating stays a manual stop/start). Toggle it off in
+Settings, or use "Check now".
+
 ## Where jobs run
 
 Pick in **Settings → Where ffmpeg jobs run**:

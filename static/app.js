@@ -121,6 +121,11 @@ async function refreshStatus() {
     if (!s.configured) { b.textContent = "⚙ not configured"; b.className = "badge"; }
     else if (s.plex_ok) { b.textContent = `● ${s.server.name} v${s.server.version}`; b.className = "badge up"; }
     else { b.textContent = "● Plex unreachable"; b.className = "badge down"; b.title = s.plex_error; }
+    const u = $("#update-badge");
+    const show = s.update && s.update.enabled && s.update.available;
+    u.classList.toggle("hidden", !show);
+    if (show) u.title = `Running ${s.update.current}, latest is ${s.update.latest}. ` +
+      "Stop and start the app in TrueNAS to update.";
   } catch { /* ignore */ }
 }
 
@@ -235,7 +240,67 @@ window.hPage = (dir) => { hState.offset += dir * hState.limit; loadHistory(); };
 /* ---------- libraries ---------- */
 
 let currentLib = null;
-const mState = { offset: 0, limit: 50 };
+const mState = { offset: 0, limit: 50, sorts: [] };
+
+/* ---------- multi-level sort (Airtable-style) ---------- */
+
+const SORT_FIELDS = [
+  ["title", "Title"], ["added", "Added"], ["year", "Year"], ["size", "File size"],
+  ["bitrate", "Bitrate"], ["resolution", "Resolution"], ["container", "Container"],
+  ["video_codec", "Video codec"], ["channels", "Audio channels"], ["duration", "Duration"],
+];
+
+function renderSortRows() {
+  const rows = $("#m-sort-rows");
+  rows.innerHTML = mState.sorts.length ? mState.sorts.map((s, i) => `
+    <div class="sort-row" data-i="${i}">
+      <select class="sort-field">${SORT_FIELDS.map(([v, l]) =>
+        `<option value="${v}"${v === s.field ? " selected" : ""}>${l}</option>`).join("")}</select>
+      <select class="sort-dir">
+        <option value="asc"${s.dir === "asc" ? " selected" : ""}>A → Z / low → high</option>
+        <option value="desc"${s.dir === "desc" ? " selected" : ""}>Z → A / high → low</option>
+      </select>
+      <button class="btn ghost small danger sort-del">✕</button>
+    </div>`).join("")
+    : `<div class="sort-empty">No sorts — using the default (title A → Z).</div>`;
+
+  $$("#m-sort-rows .sort-row").forEach((row) => {
+    const i = +row.dataset.i;
+    row.querySelector(".sort-field").addEventListener("change", (e) => {
+      mState.sorts[i].field = e.target.value; applySorts();
+    });
+    row.querySelector(".sort-dir").addEventListener("change", (e) => {
+      mState.sorts[i].dir = e.target.value; applySorts();
+    });
+    row.querySelector(".sort-del").addEventListener("click", () => {
+      mState.sorts.splice(i, 1); renderSortRows(); applySorts();
+    });
+  });
+  const n = mState.sorts.length;
+  const btn = $("#m-sort-btn");
+  btn.textContent = n ? `${n} sort${n > 1 ? "s" : ""}` : "Sort";
+  btn.classList.toggle("sorting", n > 0);
+}
+
+function applySorts() {
+  mState.offset = 0;
+  clearTimeout(window._mT);
+  window._mT = setTimeout(loadMedia, 250);
+}
+
+$("#m-sort-btn").addEventListener("click", () => {
+  $("#m-sort-pop").classList.toggle("hidden");
+  renderSortRows();
+});
+$("#m-sort-close").addEventListener("click", () => $("#m-sort-pop").classList.add("hidden"));
+$("#m-sort-add").addEventListener("click", () => {
+  mState.sorts.push({ field: "title", dir: "asc" });
+  renderSortRows();
+  applySorts();
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".sort-wrap")) $("#m-sort-pop").classList.add("hidden");
+});
 
 async function loadLibraries() {
   $("#library-detail").classList.add("hidden");
@@ -360,6 +425,7 @@ async function loadMedia() {
     audio_codec: $("#m-acodec").value,
     audio_channels: $("#m-achannels").value,
     missing_stereo: $("#m-missing-stereo").checked,
+    sort: mState.sorts.map((s) => `${s.field}:${s.dir}`).join(",") || "title",
     offset: mState.offset,
     limit: mState.limit,
   });
@@ -700,7 +766,30 @@ async function loadSettings() {
   $("#plex-url").value = s.plex_url || "";
   $("#plex-token").value = s.plex_token || "";
   $("#server-name").value = s.server_display_name || "";
+  $("#update-check-enabled").checked = s.update_check_enabled !== false;
 }
+
+$("#update-check-enabled").addEventListener("change", async () => {
+  await api.post("/api/settings", { update_check_enabled: $("#update-check-enabled").checked });
+  toast($("#update-check-enabled").checked ? "Weekly update check on" : "Update checks off");
+  refreshStatus();
+});
+
+$("#update-check-now").addEventListener("click", async () => {
+  const m = $("#update-msg");
+  m.textContent = "Checking GitHub…"; m.className = "msg";
+  try {
+    const r = await api.post("/api/update-check", {});
+    if (!r.ok) { m.textContent = r.error; m.className = "msg err"; }
+    else if (r.available) {
+      m.textContent = `Update available — running ${r.current}, latest is ${r.latest}. ` +
+        "Stop and start the app to update.";
+      m.className = "msg ok";
+    } else if (r.error) { m.textContent = r.error; m.className = "msg err"; }
+    else { m.textContent = `Up to date (${r.current}).`; m.className = "msg ok"; }
+    refreshStatus();
+  } catch (e) { m.textContent = e.message; m.className = "msg err"; }
+});
 
 $("#plex-test").addEventListener("click", async () => {
   const m = $("#settings-msg");

@@ -35,6 +35,7 @@
     </nav>
 
     <div class="sidebar-foot">
+      <div id="update-badge" class="badge update hidden" title="">⬆ Update available</div>
       <div id="mode-badge" class="badge mode">…</div>
       <div id="server-badge" class="badge">…</div>
     </div>
@@ -234,6 +235,19 @@
               <div id="out-preview" class="out-preview"></div>
             </fieldset>
 
+            <fieldset class="suffix-box">
+              <legend>When to run</legend>
+              <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+                <label class="chk"><input type="radio" name="run-when" value="now" checked> Run now (next in queue)</label>
+                <label class="chk"><input type="radio" name="run-when" value="at"> Hold until</label>
+                <input type="datetime-local" id="run-at" disabled>
+              </div>
+              <div class="muted small" style="margin-top:8px">Hold lets you stack up several
+              jobs that all start at the chosen time (e.g. overnight) — they still run one
+              at a time, in the order queued. Scheduled jobs can be started early or
+              canceled from the Jobs page.</div>
+            </fieldset>
+
             <div class="btn-row">
               <button class="btn primary" id="queue-btn">Queue job</button>
             </div>
@@ -324,6 +338,19 @@
             <button class="btn primary" id="settings-save">Save all settings</button>
           </div>
           <div id="exec-msg" class="msg"></div>
+        </div>
+
+        <div class="panel" style="max-width:720px">
+          <h3>Updates</h3>
+          <label class="chk"><input type="checkbox" id="update-check-enabled" checked>
+            Check for new versions every Sunday at midnight</label>
+          <p class="muted small">Only a notice in the sidebar — nothing updates by itself.
+          To update, stop and start the app in TrueNAS (with <code>pull_policy: always</code>
+          it pulls the newest image on start).</p>
+          <div class="btn-row">
+            <button class="btn" id="update-check-now">Check now</button>
+          </div>
+          <div id="update-msg" class="msg"></div>
         </div>
       </section>
     </main>

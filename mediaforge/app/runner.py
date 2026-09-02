@@ -26,7 +26,7 @@ class JobRunner:
         job = await db.get_job(job_id)
         if job is None:
             return False
-        if job["status"] == "queued":
+        if job["status"] in ("queued", "scheduled"):
             await db.update_job(job_id, status="canceled",
                                 error="Canceled before it started",
                                 finished_at=int(time.time()))
@@ -42,6 +42,7 @@ class JobRunner:
         log.info("job runner started")
         while True:
             try:
+                await db.release_due_jobs()
                 job = await db.next_queued_job()
                 if job is None:
                     await asyncio.sleep(2)

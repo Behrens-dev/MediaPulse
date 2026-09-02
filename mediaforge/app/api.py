@@ -9,11 +9,23 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from . import db, executor as ex, ffmpeg_cmd, plex
-from .config import APP_VERSION, UPLOADS_DIR
+from . import db, executor as ex, ffmpeg_cmd, plex, update_check
+from .config import APP_VERSION, GIT_SHA, UPLOADS_DIR
 from .runner import runner
 
 router = APIRouter(prefix="/api")
+
+
+async def _update_info() -> dict:
+    st = await db.get_setting("update_status", {}) or {}
+    return {
+        "enabled": bool(await db.get_setting("update_check_enabled", True)),
+        "available": bool(st.get("available")),
+        "current": GIT_SHA[:7],
+        "latest": (st.get("latest_sha") or "")[:7],
+        "checked_at": st.get("checked_at") or 0,
+        "error": st.get("error") or "",
+    }
 
 
 def _err(e: Exception) -> HTTPException:
@@ -53,7 +65,17 @@ async def status():
         "mode": mode,
         "jobs": counts,
         "running_id": runner.current_id,
+        "update": await _update_info(),
     }
+
+
+@router.post("/update-check")
+async def run_update_check():
+    if not GIT_SHA:
+        return {"ok": False, "error": "This build has no version stamp (dev build) — "
+                                      "update checks only work on the published image."}
+    await update_check.check_now()
+    return {"ok": True, **(await _update_info())}
 
 
 SETTING_KEYS = [
@@ -61,7 +83,7 @@ SETTING_KEYS = [
     "exec_mode",
     "ssh_host", "ssh_port", "ssh_username", "ssh_os", "ssh_auth",
     "ssh_password", "ssh_key", "ssh_key_passphrase",
-    "path_maps_local", "path_maps_ssh",
+    "path_maps_local", "path_maps_ssh", "update_check_enabled",
 ]
 
 DEFAULTS = {
@@ -69,6 +91,7 @@ DEFAULTS = {
     "ssh_port": 22,
     "ssh_os": "linux",
     "ssh_auth": "password",
+    "update_check_enabled": True,
     "path_maps_local": [],
     "path_maps_ssh": [],
 }
@@ -346,14 +369,29 @@ async def create_job(payload: dict):
         except ffmpeg_cmd.BuildError as e:
             raise _bad(str(e))
 
+        # run now (default) or hold in the queue until a scheduled start time
+        schedule = payload.get("schedule") or {}
+        status, run_at = "queued", None
+        if schedule.get("mode") == "at":
+            try:
+                run_at = int(schedule.get("run_at"))
+            except (TypeError, ValueError):
+                raise _bad("The scheduled start time is missing or invalid.")
+            if run_at > int(time.time()):
+                status = "scheduled"
+            else:
+                run_at = None  # time already passed — just queue it now
+
         job_id = await db.create_job(
             kind=kind, title=payload.get("title") or os.path.basename(plex_path),
             rating_key=str(payload.get("rating_key") or ""),
             plex_path=plex_path, input_path=in_path, output_path=out_path,
             suffix=suffix, options=options, mode=mode,
             duration_ms=ffmpeg_cmd.duration_ms(probe_data),
+            status=status, run_at=run_at,
         )
-        return {"ok": True, "id": job_id, "output": out_path}
+        return {"ok": True, "id": job_id, "output": out_path,
+                "status": status, "run_at": run_at}
     except ex.ExecError as e:
         raise _err(e)
     finally:
@@ -382,6 +420,18 @@ async def cancel_job(job_id: int):
     ok = await runner.cancel(job_id)
     if not ok:
         raise _bad("Job is not queued or running.")
+    return {"ok": True}
+
+
+@router.post("/jobs/{job_id}/start")
+async def start_job(job_id: int):
+    """Release a scheduled job into the queue right now."""
+    row = await db.get_job(job_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    if row["status"] != "scheduled":
+        raise _bad("Only scheduled jobs can be started early.")
+    await db.update_job(job_id, status="queued", run_at=None)
     return {"ok": True}
 
 

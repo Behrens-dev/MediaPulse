@@ -2,7 +2,11 @@
 import os
 from pathlib import Path
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
+
+# baked in by the GitHub Actions build (--build-arg GIT_SHA=...); empty in dev
+GIT_SHA = os.environ.get("GIT_SHA", "")
+UPDATE_REPO = os.environ.get("UPDATE_REPO", "Behrens-dev/MediaPulse")
 
 DATA_DIR = Path(os.environ.get("MEDIAFORGE_DATA", "/config"))
 DB_PATH = DATA_DIR / "mediaforge.db"

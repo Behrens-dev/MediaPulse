@@ -6,10 +6,23 @@ import time
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
-from . import db, plex, media_sync, notify
+from . import db, plex, media_sync, notify, update_check
+from .config import GIT_SHA
 from .poller import activity_poller, health_monitor
 
 router = APIRouter(prefix="/api")
+
+
+async def _update_info() -> dict:
+    st = await db.get_setting("update_status", {}) or {}
+    return {
+        "enabled": bool(await db.get_setting("update_check_enabled", True)),
+        "available": bool(st.get("available")),
+        "current": GIT_SHA[:7],
+        "latest": (st.get("latest_sha") or "")[:7],
+        "checked_at": st.get("checked_at") or 0,
+        "error": st.get("error") or "",
+    }
 
 
 def _err(e: Exception) -> HTTPException:
@@ -41,7 +54,17 @@ async def status():
             "last_ok_at": health_monitor.last_ok_at,
             "last_error": health_monitor.last_error,
         },
+        "update": await _update_info(),
     }
+
+
+@router.post("/update-check")
+async def run_update_check():
+    if not GIT_SHA:
+        return {"ok": False, "error": "This build has no version stamp (dev build) — "
+                                      "update checks only work on the published image."}
+    await update_check.check_now()
+    return {"ok": True, **(await _update_info())}
 
 
 SETTING_KEYS = [
@@ -51,7 +74,7 @@ SETTING_KEYS = [
     "recipients", "alert_recipients", "alert_server_down",
     "newsletter_enabled", "newsletter_day", "newsletter_hour", "newsletter_days_back",
     "outage_auto_enabled", "outage_auto_delay_min", "outage_auto_message",
-    "auto_sync_interval_min",
+    "auto_sync_interval_min", "update_check_enabled",
 ]
 
 DEFAULTS = {
@@ -60,7 +83,7 @@ DEFAULTS = {
     "newsletter_enabled": False, "newsletter_day": 1, "newsletter_hour": 9,
     "newsletter_days_back": 30,
     "outage_auto_enabled": False, "outage_auto_delay_min": 15, "outage_auto_message": "",
-    "auto_sync_interval_min": 0,
+    "auto_sync_interval_min": 0, "update_check_enabled": True,
 }
 
 
@@ -300,16 +323,29 @@ async def library_media(
         where.append("EXISTS (SELECT 1 FROM audio_streams a WHERE a.rating_key=m.rating_key AND a.channels>2)")
     w = " AND ".join(where)
 
-    sort_col = {
-        "title": "m.sort_title", "year": "m.year", "size": "m.file_size",
+    # `sort` accepts multi-level specs like "size:desc,title:asc" (fields are
+    # whitelisted below); a bare field name plus the legacy `order` param still works
+    sort_cols = {
+        "title": "m.sort_title COLLATE NOCASE", "year": "m.year", "size": "m.file_size",
         "added": "m.added_at", "bitrate": "m.bitrate_kbps", "resolution": "m.video_resolution",
-    }.get(sort, "m.sort_title")
-    direction = "DESC" if order.lower() == "desc" else "ASC"
+        "container": "m.container COLLATE NOCASE", "video_codec": "m.video_codec COLLATE NOCASE",
+        "channels": "m.audio_channels", "duration": "m.duration_ms",
+    }
+    order_by = []
+    for part in (sort or "").split(","):
+        field, _, dr = part.strip().partition(":")
+        col = sort_cols.get(field)
+        if col is None:
+            continue
+        dr = "DESC" if (dr or order).lower() == "desc" else "ASC"
+        order_by.append(f"{col} {dr}")
+    if not order_by:
+        order_by = ["m.sort_title COLLATE NOCASE ASC"]
 
     async with conn.execute(f"SELECT COUNT(*) c FROM media_items m WHERE {w}", params) as cur:
         total = (await cur.fetchone())["c"]
     async with conn.execute(
-        f"SELECT m.* FROM media_items m WHERE {w} ORDER BY {sort_col} {direction} LIMIT ? OFFSET ?",
+        f"SELECT m.* FROM media_items m WHERE {w} ORDER BY {', '.join(order_by)} LIMIT ? OFFSET ?",
         params + [limit, offset],
     ) as cur:
         rows = [dict(r) for r in await cur.fetchall()]

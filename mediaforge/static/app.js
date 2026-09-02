@@ -110,6 +110,11 @@ async function refreshStatus() {
     $("#mode-badge").textContent =
       (s.mode === "ssh" ? "⚡ runs on Plex server" : "⚡ runs in container")
       + (s.version ? " · v" + s.version : "");
+    const u = $("#update-badge");
+    const showU = s.update && s.update.enabled && s.update.available;
+    u.classList.toggle("hidden", !showU);
+    if (showU) u.title = `Running ${s.update.current}, latest is ${s.update.latest}. ` +
+      "Stop and start the app in TrueNAS to update.";
     const running = s.jobs.running || 0, queued = s.jobs.queued || 0;
     $("#topbar-info").textContent =
       running || queued ? `${running} running · ${queued} queued` : "";
@@ -453,6 +458,27 @@ function updateOutPreview() {
 }
 $("#suffix").addEventListener("input", updateOutPreview);
 
+/* ---------- run now vs scheduled ---------- */
+
+$$("input[name=run-when]").forEach((r) =>
+  r.addEventListener("change", () => {
+    const at = $$("input[name=run-when]").find((i) => i.checked).value === "at";
+    $("#run-at").disabled = !at;
+    if (at && !$("#run-at").value) {
+      // default: last-used time, else tonight at midnight
+      const saved = localStorage.getItem("mf_run_at");
+      if (saved && new Date(saved) > new Date()) {
+        $("#run-at").value = saved;
+      } else {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        d.setHours(0, 0, 0, 0);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        $("#run-at").value = d.toISOString().slice(0, 16);
+      }
+    }
+  }));
+
 /* ---------- queue job ---------- */
 
 function readSubFile() {
@@ -543,18 +569,34 @@ $("#queue-btn").addEventListener("click", async () => {
     return;
   }
 
+  // run now, or hold in the queue until a scheduled time
+  const schedule = { mode: "now" };
+  if ($$("input[name=run-when]").find((i) => i.checked).value === "at") {
+    const v = $("#run-at").value;
+    if (!v) {
+      msg.className = "msg err";
+      msg.textContent = "Pick a start date & time, or switch back to “Run now”.";
+      return;
+    }
+    schedule.mode = "at";
+    schedule.run_at = Math.floor(new Date(v).getTime() / 1000);
+    localStorage.setItem("mf_run_at", v);
+  }
+
   const btn = $("#queue-btn");
   btn.disabled = true;
   try {
     const res = await api.post("/api/jobs", {
-      kind, options, suffix,
+      kind, options, suffix, schedule,
       path: f.path,
       title: state.item.title,
       rating_key: state.item.rating_key,
     });
     msg.className = "msg ok";
-    msg.textContent = `Queued job #${res.id} → ${res.output}`;
-    toast(`Job #${res.id} queued (${KIND_LABELS[kind]})`);
+    msg.textContent = res.status === "scheduled"
+      ? `Job #${res.id} scheduled for ${fmtDate(res.run_at)} → ${res.output}`
+      : `Queued job #${res.id} → ${res.output}`;
+    toast(`Job #${res.id} ${res.status === "scheduled" ? "scheduled" : "queued"} (${KIND_LABELS[kind]})`);
     refreshStatus();
   } catch (e) {
     msg.className = "msg err";
@@ -575,9 +617,9 @@ async function loadJobs() {
   if (currentPage !== "jobs") return;
   try {
     const rows = await api.get("/api/jobs?limit=200");
-    const counts = { queued: 0, running: 0, done: 0, error: 0, canceled: 0 };
+    const counts = { queued: 0, scheduled: 0, running: 0, done: 0, error: 0, canceled: 0 };
     rows.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
-    $("#jobs-stats").innerHTML = ["running", "queued", "done", "error"].map((k) =>
+    $("#jobs-stats").innerHTML = ["running", "queued", "scheduled", "done", "error"].map((k) =>
       `<div class="stat"><b>${counts[k] || 0}</b><span>${k}</span></div>`).join("");
 
     if (!rows.length) {
@@ -597,11 +639,15 @@ function jobRow(r) {
   const prog = r.status === "running"
     ? `<div class="progress"><div style="width:${r.progress || 0}%"></div></div>
        <span class="sub">${(r.progress || 0).toFixed(0)}%</span>`
-    : (r.status === "error" ? `<div class="sub" style="color:var(--red)">${esc((r.error || "").split("\n")[0])}</div>` : "");
+    : r.status === "scheduled"
+      ? `<div class="sub">starts ${fmtDate(r.run_at)}</div>`
+      : (r.status === "error" ? `<div class="sub" style="color:var(--red)">${esc((r.error || "").split("\n")[0])}</div>` : "");
   const outName = (r.output_path || "").split(/[\\/]/).pop();
   const actions = [
     `<button class="btn ghost small" data-act="log" data-id="${r.id}">Log</button>`,
-    (r.status === "queued" || r.status === "running")
+    (r.status === "scheduled")
+      ? `<button class="btn ghost small" data-act="start" data-id="${r.id}">Start now</button>` : "",
+    (r.status === "queued" || r.status === "running" || r.status === "scheduled")
       ? `<button class="btn ghost small danger" data-act="cancel" data-id="${r.id}">Cancel</button>` : "",
     (r.status === "error" || r.status === "canceled")
       ? `<button class="btn ghost small" data-act="retry" data-id="${r.id}">Retry</button>` : "",
@@ -622,6 +668,7 @@ function jobRow(r) {
 async function jobAction(act, id) {
   try {
     if (act === "log") return showJobLog(id);
+    if (act === "start") await api.post(`/api/jobs/${id}/start`);
     if (act === "cancel") await api.post(`/api/jobs/${id}/cancel`);
     if (act === "retry") await api.post(`/api/jobs/${id}/retry`);
     if (act === "delete") await api.del(`/api/jobs/${id}`);
@@ -684,6 +731,7 @@ async function loadSettings() {
     $("#ssh-key-passphrase").value = "";
     mapState.local = s.path_maps_local || [];
     mapState.ssh = s.path_maps_ssh || [];
+    $("#update-check-enabled").checked = s.update_check_enabled !== false;
     onModeChange();
   } catch (e) { toast(e.message, true); }
 }
@@ -763,6 +811,29 @@ $("#settings-save").addEventListener("click", async () => {
     m.className = "msg err";
     m.textContent = e.message;
   }
+});
+
+$("#update-check-enabled").addEventListener("change", async () => {
+  await api.post("/api/settings", { update_check_enabled: $("#update-check-enabled").checked });
+  toast($("#update-check-enabled").checked ? "Weekly update check on" : "Update checks off");
+  refreshStatus();
+});
+
+$("#update-check-now").addEventListener("click", async () => {
+  const m = $("#update-msg");
+  m.className = "msg";
+  m.textContent = "Checking GitHub…";
+  try {
+    const r = await api.post("/api/update-check", {});
+    if (!r.ok) { m.className = "msg err"; m.textContent = r.error; }
+    else if (r.available) {
+      m.className = "msg ok";
+      m.textContent = `Update available — running ${r.current}, latest is ${r.latest}. ` +
+        "Stop and start the app to update.";
+    } else if (r.error) { m.className = "msg err"; m.textContent = r.error; }
+    else { m.className = "msg ok"; m.textContent = `Up to date (${r.current}).`; }
+    refreshStatus();
+  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
 });
 
 $("#plex-test").addEventListener("click", async () => {

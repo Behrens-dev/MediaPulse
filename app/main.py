@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import db, update_check
 from .api import router
 from .config import ensure_data_dir
 from .poller import activity_poller, auto_sync_scheduler, health_monitor, newsletter_scheduler
@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(health_monitor.run()),
         asyncio.create_task(newsletter_scheduler.run()),
         asyncio.create_task(auto_sync_scheduler.run()),
+        asyncio.create_task(update_check.run()),
     ]
     yield
     for t in tasks:

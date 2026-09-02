@@ -15,6 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY static ./static
 
+# commit this image was built from (set by CI); powers the weekly update check
+ARG GIT_SHA=
+ENV GIT_SHA=${GIT_SHA}
+
 ENV MEDIAFORGE_DATA=/config
 VOLUME /config
 EXPOSE 8191
